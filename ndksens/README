@@ -1,0 +1,39 @@
+# ndksens: nucleon decay sensitivity
+
+ndksens is a set of python scripts to compute partial lifetime sensitivities as a function of exposure for nucleon decay experimental searches. Pre-defined efficiency/background rate assumptions for several decay modes are defined for an argon-based DUNE-like setup. The scripts can also be easily customized for any other source/efficiency/background conditions.   
+
+### Authors and credits
+
+ndksens is written and maintained by Michel Sorel (sorel@fnal.gov). 
+
+ndksens originates from pybbsens, a similar set of scripts for neutrinoless double beta decay searches, written and maintained by Justo Martin-Albo and Juan Jose Gomez-Cadenas. For more details about pybbsens, see: https://github.com/jmalbos/pybbsens
+
+For more details about the statistical treatment used in ndksens and pybbsens, please refer to:
+J.J. Gomez-Cadenas, J. Martin-Albo, M. Sorel et al., "Sense and sensitivity of double beta decay experiments," JCAP 1106 (2011) 007, http://arxiv.org/abs/1010.5112
+
+The decay mode numbering scheme adopted matches the one of the Particle Data Group, see: http://pdg.lbl.gov/2015/listings/rpp2015-list-p.pdf
+
+The pre-defined efficiency/background assumptions for an argon-based detector are taken from: 
+A. Bueno et al., "Nucleon decay searches with large liquid argon TPC detectors at shallow depths: atmospheric and cosmogenic backgrounds," JHEP 0704 (2007) 041, http://arxiv.org/abs/hep-ph/0701101
+
+
+### License
+
+Released under the MIT license, see: http://opensource.org/licenses/MIT
+
+### Dependencies
+
+ROOT built with python support, NumPy, SciPy
+
+### Setup
+
+PYTHONPATH needs to include the path to the python and SciPy installations. It also needs to include $ROOTSYS/lib. PATH needs to include the path to the NumPy installation. 
+
+### Example usage
+
+Start with:
+python examples/DUNE_predefined.py
+or
+python examples/DUNE_custom.py
+
+then create your own examples.
