@@ -1,0 +1,19 @@
+For a dependency database to be useful, it should be built against 
+dunendk, dunetpc and the larsoft suite. 
+
+To generate a new base_dependency_database:
+
+setup the environment for mrb
+mkdir <some_working_dir>
+cd <some_working_dir>
+mrb newDev -v <version> -q <quals>
+source localProductsXXX/setup
+cd srcs
+mrb g [-t <version>] larsoft_suite
+mrb g [-t <version>] dunetpc
+mrb g [-t <version>] dunendk
+cd $MRB_BUILDDIR
+mrbsetenv
+mrb b [-jN]
+mrb md
+cp .dependency_database  $MRB_SOURCE/dunendk/releaseDB/base_dependency_database

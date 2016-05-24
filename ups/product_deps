@@ -1,0 +1,57 @@
+# This @product_deps@ file defines dependencies for this package. 
+
+# The *parent* line must the first non-commented line and defines this product and version
+# The version must be of the form vxx_yy_zz (e.g. v01_02_03).
+parent dunendk v05_11_00
+defaultqual e9
+
+# These optional lines define where headers, libraries, and executables go and should
+# be used only if your product does not conform to the defaults.
+# Format: directory_type directory_path directory_name
+#   where directory_type is one of incdir, libdir, or bindir
+#   where directory_path is one of product_dir, fq_dir and - 
+# Defaults:
+# incdir  product_dir  include
+# fcldir  product_dir  fcl
+# libdir  fq_dir       lib
+# bindir  fq_dir       bin
+#
+fcldir  product_dir job
+gdmldir product_dir gdml
+fwdir  product_dir config_data
+
+# table fragment to set FW_SEARCH_PATH needed 
+# to find gdml files:
+table_fragment_begin
+    pathPrepend(FHICL_FILE_PATH, .:./job)
+table_fragment_end
+
+
+# With "product  version" table below, we now define depdendencies
+
+# Add the dependent product and version
+
+product          version
+larsoft         v05_11_00
+duneutil        v01_21_03	-	optional
+dune_pardata	v01_09_00
+cetbuildtools	v4_19_04	-	only_for_build
+dunetpc	        v05_11_00
+end_product_list
+
+
+# We now define allowed qualifiers and the corresponding qualifiers for the depdencies.
+# Make a table by adding columns before "notes". 
+# e9  - with gcc 4.9.3 and -std=c++14
+qualifier	larsoft		duneutil	dune_pardata	dunetpc		notes
+e9:debug	e9:debug	e9:debug	-nq-		e9:debug
+e9:opt		e9:opt		e9:opt		-nq-		e9:opt
+e9:prof		e9:prof		e9:prof		-nq-		e9:prof
+end_qualifier_list
+
+# Preserve tabs and formatting in emacs and vi / vim:
+
+### Local Variables:
+### tab-width: 8
+### End:
+
