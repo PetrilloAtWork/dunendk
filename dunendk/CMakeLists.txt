@@ -1,4 +1,5 @@
 #add_subdirectory(NewSubdirectory)
+add_subdirectory(ndkAna)
 
 
 # Respect the order specified in lar_build, which is:
