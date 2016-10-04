@@ -1,3 +1,8 @@
+//Ana module for nucleon decay and atmospheric background analysis
+//Ana TTre contains MC truth info and Reconstruction 
+//ahiguera@central.uh.edu
+
+
 #ifndef NDKAna_Module
 #define NDKAna_Module
 
@@ -81,6 +86,7 @@ private:
     std::string fOpFlashModuleLabel;
     std::string fShowerModuleLabel;
     std::string fHitsModuleLabel;
+    std::string fGenieGenModuleLabel;
     double 	fPIDA_endPoint;
     bool	fSaveMCTree; 
  
@@ -103,6 +109,12 @@ private:
     double MC_endMomentum[MAX_TRACKS][4];  
     double MC_truthlength[MAX_TRACKS];
     double MC_Prange[MAX_TRACKS];
+    int    MC_ndk_pdg;
+    double MC_ndkMomentum[4];
+    int    MC_noFSIpdg[MAX_TRACKS];
+    double MC_noFSIMomentum[MAX_TRACKS][4];
+    int    MC_noFSIhadrons;
+ 
     std::vector<string> MC_process;  //particle 
 
     int    n_vertices;
@@ -197,7 +209,8 @@ void NDKAna::reconfigure(fhicl::ParameterSet const& p){
     fTrackModuleLabel    = p.get<std::string>("TrackModuleLabel");
     fOpFlashModuleLabel  = p.get<std::string>("OpFlashModuleLabel");
     fShowerModuleLabel	 = p.get<std::string>("ShowerModuleLabel");
-    fHitsModuleLabel     = p.get< std::string >("HitsModuleLabel");
+    fHitsModuleLabel     = p.get<std::string>("HitsModuleLabel");
+    fGenieGenModuleLabel = p.get<std::string>("GenieGenModuleLabel");
     fSaveMCTree		 = p.get<bool>("SaveMCTree");
     fPIDA_endPoint	 = p.get<double>("PIDA_endPoint");
     fFidVolCutX          = p.get<double>("FidVolCutX");
@@ -265,6 +278,11 @@ void NDKAna::beginJob(){
     fEventTree->Branch("mc_endMomentum", &MC_endMomentum, "mc_endMomentum[mc_npart][4]/D"); 
     fEventTree->Branch("mc_Prange", &MC_Prange, "mc_Prange[mc_npart]/D"); 
     fEventTree->Branch("mc_truthlength", &MC_truthlength, "mc_truthlength[mc_npart]/D"); 
+    fEventTree->Branch("mc_ndk_pdg", &MC_ndk_pdg);
+    fEventTree->Branch("mc_ndkMomentum", &MC_ndkMomentum,"mc_ndkMomentum[4]/D");
+    fEventTree->Branch("mc_noFSIhadrons", &MC_noFSIhadrons, "mc_noFSIhadrons/I");
+    fEventTree->Branch("mc_no_FSIpdg", &MC_noFSIpdg, "mc_no_FSIpdg[mc_noFSIhadrons]/I");
+    fEventTree->Branch("mc_noFSIMomentum", &MC_noFSIMomentum, "MC_noFSIMomentum[mc_noFSIhadrons][4]/D");
     fEventTree->Branch("mc_process", &MC_process); 
 
     fEventTree->Branch("n_vertices", &n_vertices);
@@ -372,6 +390,40 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        MC_truthlength[i] = truthLength(particle);
        MC_Prange[i] = myPrange(MC_truthlength[i]);
        ++i; //paticle index
+    }
+    
+    art::Handle< std::vector<simb::MCTruth> > mctruthListHandle;
+    std::vector<art::Ptr<simb::MCTruth> > mclist;
+    if(event.getByLabel(fGenieGenModuleLabel,mctruthListHandle))
+    art::fill_ptr_vector(mclist, mctruthListHandle);
+
+    art::Ptr<simb::MCTruth> mctruth = mclist[0];
+    int n_genie_particles = mctruth->NParticles();
+
+    int k=0;
+    //MC_noFSIhadrons = n_genie_particles;
+    for( int j =0; j<n_genie_particles; ++j ){ 
+       simb::MCParticle particle = mctruth->GetParticle(j);
+       if( particle.StatusCode() == 14 ){
+         k ++;
+       }
+    }
+    MC_noFSIhadrons = k; //nomber of hadrons at the vertex i.e. before FSI
+    int no_FSI_index =0;
+    for( int j =0; j<n_genie_particles; ++j ){ 
+       simb::MCParticle particle = mctruth->GetParticle(j);
+       //cout<<"particle "<<particle.PdgCode()<<" "<<particle.Process()<<" "<<particle.StatusCode()<<endl;
+       if( particle.StatusCode() == 3 ){ //it should be only one decay!!
+         MC_ndk_pdg = particle.PdgCode();
+         const TLorentzVector& momentum = particle.Momentum(0);
+         momentum.GetXYZT(MC_ndkMomentum);             
+       }
+       if( particle.StatusCode() == 14 ){
+         MC_noFSIpdg[no_FSI_index] = particle.PdgCode();  //save particle info before FSI i.e. at the vertex
+         const TLorentzVector& momentum = particle.Momentum(0);
+         momentum.GetXYZT(MC_noFSIMomentum[no_FSI_index]);
+         no_FSI_index ++;
+       }
     }
 
     isFiducial =insideFV( MC_vertex );
@@ -686,13 +738,16 @@ void NDKAna::reset(){
    MC_npart =-999; 
    n_recoTracks =-999;
    n_vertices = -999;
+   MC_ndk_pdg = -999; 
    for(int i = 0; i<4; ++i){
       MC_vertex[i] = -999.0;
+      MC_ndkMomentum[i] = -999.0;
    }
   
    for(int i=0; i<MAX_TRACKS; ++i) {
        MC_id[i] = -999;
        MC_pdg[i] = -999;
+       MC_noFSIpdg[i]    = -999;
        MC_mother[i] = -999;
        MC_truthlength[i] = -999.0;
        MC_truthlength[i] = -999.0;
@@ -712,6 +767,7 @@ void NDKAna::reset(){
           MC_endXYZT[i][j]        = -999.0;
           MC_startMomentum[i][j]  = -999.0;
           MC_endMomentum[i][j]    = -999.0;
+          MC_noFSIMomentum[i][j]  = -999.0;
 	  track_vtx[i][j] 	  = -999.0;
 	  track_end[i][j] 	  = -999.0;
        }
