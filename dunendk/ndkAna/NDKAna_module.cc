@@ -41,15 +41,10 @@
 #include "TFile.h"
 #include "TTree.h"
 #include "TDirectory.h"
-#include "TH1.h"
-#include "TH2.h"
-#include "TEfficiency.h"
-#include "TGraphAsymmErrors.h"
 
 #define MAX_TRACKS 1000
 #define MAX_FLASHES 1000
 #define MAX_SHOWERS 1000
-#define MAX_HITS 200000
 
 using namespace std;
 
@@ -85,8 +80,6 @@ private:
     std::string fTrackModuleLabel;
     std::string fOpFlashModuleLabel;
     std::string fShowerModuleLabel;
-    std::string fHitsModuleLabel;
-    std::string fGenieGenModuleLabel;
     double 	fPIDA_endPoint;
     bool	fSaveMCTree; 
  
@@ -109,13 +102,7 @@ private:
     double MC_endMomentum[MAX_TRACKS][4];  
     double MC_truthlength[MAX_TRACKS];
     double MC_Prange[MAX_TRACKS];
-    int    MC_ndk_pdg;
-    double MC_ndkMomentum[4];
-    int    MC_noFSIpdg[MAX_TRACKS];
-    double MC_noFSIMomentum[MAX_TRACKS][4];
-    int    MC_noFSIhadrons;
  
-    std::vector<string> MC_process;  //particle 
 
     int    n_vertices;
     double vertex[MAX_TRACKS][4];
@@ -130,8 +117,6 @@ private:
     double track_KE[MAX_TRACKS];
     double track_Prange[MAX_TRACKS];
     double track_myPrange[MAX_TRACKS];
-    double track_multiScattChi2[MAX_TRACKS];
-    double track_multiScattLLHD[MAX_TRACKS];
     double track_Efrac[MAX_TRACKS];
     int    track_mcID[MAX_TRACKS];
     int    track_mcPDG[MAX_TRACKS];
@@ -161,16 +146,6 @@ private:
     double flash_timewidth[MAX_FLASHES];
     double flash_abstime[MAX_FLASHES];
     int    flash_frame[MAX_FLASHES];
-
-    int     n_hits;                  
-    int     hit_channel[MAX_HITS]; 
-    double  hit_peakT[MAX_HITS];  
-    double  hit_charge[MAX_HITS];
-    double  hit_wireID[MAX_HITS];    
-    double  hit_plane[MAX_HITS];    
-    double  hit_tpc[MAX_HITS];    
-    int     hit_key[MAX_HITS];
-    
 
     double fFidVolCutX;
     double fFidVolCutY;
@@ -209,9 +184,6 @@ void NDKAna::reconfigure(fhicl::ParameterSet const& p){
     fTrackModuleLabel    = p.get<std::string>("TrackModuleLabel");
     fOpFlashModuleLabel  = p.get<std::string>("OpFlashModuleLabel");
     fShowerModuleLabel	 = p.get<std::string>("ShowerModuleLabel");
-    fHitsModuleLabel     = p.get<std::string>("HitsModuleLabel");
-    fGenieGenModuleLabel = p.get<std::string>("GenieGenModuleLabel");
-    fSaveMCTree		 = p.get<bool>("SaveMCTree");
     fPIDA_endPoint	 = p.get<double>("PIDA_endPoint");
     fFidVolCutX          = p.get<double>("FidVolCutX");
     fFidVolCutY          = p.get<double>("FidVolCutY");
@@ -262,80 +234,59 @@ void NDKAna::beginJob(){
 	   <<fFidVolZmin<<"\t< z <\t"<<fFidVolZmax<<"\n";
 
   art::ServiceHandle<art::TFileService> tfs;
-  if( fSaveMCTree ){
-    fEventTree = tfs->make<TTree>("Event", "Event Tree from Sim & Reco");
-    fEventTree->Branch("eventNo", &Event);
-    fEventTree->Branch("runNo", &Run);
-    fEventTree->Branch("subRunNo", &SubRun);
-    fEventTree->Branch("mc_vertex", &MC_vertex, "mc_vertex[4]/D");
-    fEventTree->Branch("mc_npart", &MC_npart);  // number of particles 
-    fEventTree->Branch("mc_id", &MC_id, "mc_id[mc_npart]/I");  
-    fEventTree->Branch("mc_pdg", &MC_pdg, "mc_pdg[mc_npart]/I"); 
-    fEventTree->Branch("mc_mother", &MC_mother, "mc_mother[mc_npart]/I"); 
-    fEventTree->Branch("mc_startXYZT", &MC_startXYZT, "mc_startXYZT[mc_npart][4]/D");  
-    fEventTree->Branch("mc_endXYZT", &MC_endXYZT, "mc_endXYZT[mc_npart][4]/D"); 
-    fEventTree->Branch("mc_startMomentum", &MC_startMomentum, "mc_startMomentum[mc_npart][4]/D");  
-    fEventTree->Branch("mc_endMomentum", &MC_endMomentum, "mc_endMomentum[mc_npart][4]/D"); 
-    fEventTree->Branch("mc_Prange", &MC_Prange, "mc_Prange[mc_npart]/D"); 
-    fEventTree->Branch("mc_truthlength", &MC_truthlength, "mc_truthlength[mc_npart]/D"); 
-    fEventTree->Branch("mc_ndk_pdg", &MC_ndk_pdg);
-    fEventTree->Branch("mc_ndkMomentum", &MC_ndkMomentum,"mc_ndkMomentum[4]/D");
-    fEventTree->Branch("mc_noFSIhadrons", &MC_noFSIhadrons, "mc_noFSIhadrons/I");
-    fEventTree->Branch("mc_no_FSIpdg", &MC_noFSIpdg, "mc_no_FSIpdg[mc_noFSIhadrons]/I");
-    fEventTree->Branch("mc_noFSIMomentum", &MC_noFSIMomentum, "MC_noFSIMomentum[mc_noFSIhadrons][4]/D");
-    fEventTree->Branch("mc_process", &MC_process); 
+  fEventTree = tfs->make<TTree>("Event", "Event Tree from Sim & Reco");
+  fEventTree->Branch("eventNo", &Event);
+  fEventTree->Branch("runNo", &Run);
+  fEventTree->Branch("subRunNo", &SubRun);
+  fEventTree->Branch("mc_vertex", &MC_vertex, "mc_vertex[4]/D");
+  fEventTree->Branch("mc_npart", &MC_npart);  // number of particles 
+  fEventTree->Branch("mc_id", &MC_id, "mc_id[mc_npart]/I");  
+  fEventTree->Branch("mc_pdg", &MC_pdg, "mc_pdg[mc_npart]/I"); 
+  fEventTree->Branch("mc_mother", &MC_mother, "mc_mother[mc_npart]/I"); 
+  fEventTree->Branch("mc_startXYZT", &MC_startXYZT, "mc_startXYZT[mc_npart][4]/D");  
+  fEventTree->Branch("mc_endXYZT", &MC_endXYZT, "mc_endXYZT[mc_npart][4]/D"); 
+  fEventTree->Branch("mc_startMomentum", &MC_startMomentum, "mc_startMomentum[mc_npart][4]/D");  
+  fEventTree->Branch("mc_endMomentum", &MC_endMomentum, "mc_endMomentum[mc_npart][4]/D"); 
+  fEventTree->Branch("mc_Prange", &MC_Prange, "mc_Prange[mc_npart]/D"); 
+  fEventTree->Branch("mc_truthlength", &MC_truthlength, "mc_truthlength[mc_npart]/D"); 
 
-    fEventTree->Branch("n_vertices", &n_vertices);
-    fEventTree->Branch("vertex", &vertex,"vertex[n_vertices][4]/D");
-    fEventTree->Branch("n_reco_tracks", &n_recoTracks);
-    fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
-    fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
-    fEventTree->Branch("n_vtxFrom_track", &n_vtxFrom_track, "n_vtxFrom_track[n_reco_tracks]/I");
-    fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
-    fEventTree->Branch("track_length", &track_length,"track_length[n_reco_tracks]/D");
-    fEventTree->Branch("track_PIDA", &track_PIDA,"track_PIDA[n_reco_tracks]/D");
-    fEventTree->Branch("track_KE", &track_KE,"track_KE[n_reco_tracks]/D");
-    fEventTree->Branch("track_Prange", &track_Prange,"track_Prange[n_reco_tracks]/D");
-    fEventTree->Branch("track_myPrange", &track_myPrange,"track_myPrange[n_reco_tracks]/D");
-    fEventTree->Branch("track_multiScattChi2", &track_multiScattChi2,"track_multiScattChi2[n_reco_tracks]/D");
-    fEventTree->Branch("track_multiScattLLHD", &track_multiScattLLHD,"track_multiScattLLHD[n_reco_tracks]/D");
-    fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");
-    fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");
-    fEventTree->Branch("track_mcPDG", &track_mcPDG,"track_mcPDG[n_reco_tracks]/I");
+  fEventTree->Branch("n_vertices", &n_vertices);
+  fEventTree->Branch("vertex", &vertex,"vertex[n_vertices][4]/D");
+  fEventTree->Branch("n_reco_tracks", &n_recoTracks);
+  fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
+  fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
+  fEventTree->Branch("n_vtxFrom_track", &n_vtxFrom_track, "n_vtxFrom_track[n_reco_tracks]/I");
+  fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
+  fEventTree->Branch("track_length", &track_length,"track_length[n_reco_tracks]/D");
+  fEventTree->Branch("track_PIDA", &track_PIDA,"track_PIDA[n_reco_tracks]/D");
+  fEventTree->Branch("track_KE", &track_KE,"track_KE[n_reco_tracks]/D");
+  fEventTree->Branch("track_Prange", &track_Prange,"track_Prange[n_reco_tracks]/D");
+  fEventTree->Branch("track_myPrange", &track_myPrange,"track_myPrange[n_reco_tracks]/D");
+  fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");
+  fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");
+  fEventTree->Branch("track_mcPDG", &track_mcPDG,"track_mcPDG[n_reco_tracks]/I");
 
-    fEventTree->Branch("n_showers", &n_recoShowers);
-    fEventTree->Branch("sh_direction_X", &sh_direction_X, "sh_direction_X[n_showers]/D");
-    fEventTree->Branch("sh_direction_Y", &sh_direction_Y, "sh_direction_Y[n_showers]/D");
-    fEventTree->Branch("sh_direction_Z", &sh_direction_Z, "sh_direction_Z[n_showers]/D");
-    fEventTree->Branch("sh_start_X", &sh_start_X, "sh_start_X[n_showers]/D");
-    fEventTree->Branch("sh_start_Y", &sh_start_Y, "sh_start_Y[n_showers]/D");
-    fEventTree->Branch("sh_start_Z", &sh_start_Z, "sh_start_Z[n_showers]/D");
-    fEventTree->Branch("sh_energy", &sh_energy, "sh_energy[n_showers][3]/D");
-    fEventTree->Branch("sh_MIPenergy", &sh_MIPenergy, "sh_MIPenergy[n_showers][3]/D");
-    fEventTree->Branch("sh_dEdx", &sh_dEdx, "sh_dEdx[n_showers][3]/D");
-    fEventTree->Branch("sh_bestplane", &sh_bestplane, "sh_bestplane[n_showers]/I");
-    fEventTree->Branch("sh_length", &sh_length, "sh_length[n_showers]/D");
+  fEventTree->Branch("n_showers", &n_recoShowers);
+  fEventTree->Branch("sh_direction_X", &sh_direction_X, "sh_direction_X[n_showers]/D");
+  fEventTree->Branch("sh_direction_Y", &sh_direction_Y, "sh_direction_Y[n_showers]/D");
+  fEventTree->Branch("sh_direction_Z", &sh_direction_Z, "sh_direction_Z[n_showers]/D");
+  fEventTree->Branch("sh_start_X", &sh_start_X, "sh_start_X[n_showers]/D");
+  fEventTree->Branch("sh_start_Y", &sh_start_Y, "sh_start_Y[n_showers]/D");
+  fEventTree->Branch("sh_start_Z", &sh_start_Z, "sh_start_Z[n_showers]/D");
+  fEventTree->Branch("sh_energy", &sh_energy, "sh_energy[n_showers][3]/D");
+  fEventTree->Branch("sh_MIPenergy", &sh_MIPenergy, "sh_MIPenergy[n_showers][3]/D");
+  fEventTree->Branch("sh_dEdx", &sh_dEdx, "sh_dEdx[n_showers][3]/D");
+  fEventTree->Branch("sh_bestplane", &sh_bestplane, "sh_bestplane[n_showers]/I");
+  fEventTree->Branch("sh_length", &sh_length, "sh_length[n_showers]/D");
 
-    fEventTree->Branch("n_hits", &n_hits);  //number of hits
-    fEventTree->Branch("hit_channel", &hit_channel, "hit_channel[n_hits]/I");  // channel ID
-    fEventTree->Branch("hit_peakT", &hit_peakT, "hit_peakT[n_hits]/D");  // peak time
-    fEventTree->Branch("hit_charge", &hit_charge, "hit_charge[n_hits]/D");  // charge (area)
-    fEventTree->Branch("hit_wireID", &hit_wireID, "hit_wireID[n_hits]/D");  // charge (area)
-    fEventTree->Branch("hit_plane", &hit_plane, "hit_plane[n_hits]/D");  // charge (area)
-    fEventTree->Branch("hit_tpc", &hit_tpc, "hit_tpc[n_hits]/D");  // charge (area)
-    fEventTree->Branch("hit_key", &hit_key, "hit_key[n_hits]/I");  // charge (area)
-
-
-    fEventTree->Branch("n_flashes", &n_flashes);
-    fEventTree->Branch("flash_time", &flash_time,"flash_time[n_flashes]/D");
-    fEventTree->Branch("flash_pe", &flash_pe,"flash_pe[n_flashes]/D");
-    fEventTree->Branch("flash_ycenter", &flash_ycenter,"flash_ycenter[n_flashes]/D");
-    fEventTree->Branch("flash_zcenter", &flash_zcenter,"flash_zcenter[n_flashes]/D");
-    fEventTree->Branch("flash_ywidth", &flash_ywidth,"flash_ywidth[n_flashes]/D");
-    fEventTree->Branch("flash_zwidth", &flash_zwidth,"flash_zwidth[n_flashes]/D");
-    fEventTree->Branch("flash_timewidth", &flash_timewidth, "flash_timewidth[n_flashes]/D");
-
-  }
+  fEventTree->Branch("n_flashes", &n_flashes);
+  fEventTree->Branch("flash_time", &flash_time,"flash_time[n_flashes]/D");
+  fEventTree->Branch("flash_pe", &flash_pe,"flash_pe[n_flashes]/D");
+  fEventTree->Branch("flash_ycenter", &flash_ycenter,"flash_ycenter[n_flashes]/D");
+  fEventTree->Branch("flash_zcenter", &flash_zcenter,"flash_zcenter[n_flashes]/D");
+  fEventTree->Branch("flash_ywidth", &flash_ywidth,"flash_ywidth[n_flashes]/D");
+  fEventTree->Branch("flash_zwidth", &flash_zwidth,"flash_zwidth[n_flashes]/D");
+  fEventTree->Branch("flash_timewidth", &flash_timewidth, "flash_timewidth[n_flashes]/D");
 
 
 }
@@ -357,9 +308,8 @@ void NDKAna::analyze( const art::Event& event ){
     SubRun = event.subRun();
     bool isFiducial = false;
     Process(event, isFiducial);
-    if( fSaveMCTree ){
-      if(isFiducial) fEventTree->Fill();
-    }
+    if(isFiducial) fEventTree->Fill();
+    
 }
 //========================================================================
 void NDKAna::Process( const art::Event& event, bool &isFiducial){
@@ -372,11 +322,9 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     if( MC_npart > MAX_TRACKS ) return;
     for( sim::ParticleList::const_iterator ipar = plist.begin(); ipar!=plist.end(); ++ipar){
        particle = ipar->second;
-       //cout<<particle->PdgCode()<<" "<<particle->Mother()<<" "<<particle->TrackId()<<endl;
        MC_id[i] = particle->TrackId();
        MC_pdg[i] = particle->PdgCode();
        MC_mother[i] = particle->Mother();
-       MC_process.push_back(particle->Process());
        const TLorentzVector& positionStart = particle->Position(0);
        const TLorentzVector& positionEnd   = particle->EndPosition();
        const TLorentzVector& momentumStart = particle->Momentum(0);
@@ -392,43 +340,8 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        ++i; //paticle index
     }
     
-    art::Handle< std::vector<simb::MCTruth> > mctruthListHandle;
-    std::vector<art::Ptr<simb::MCTruth> > mclist;
-    if(event.getByLabel(fGenieGenModuleLabel,mctruthListHandle))
-    art::fill_ptr_vector(mclist, mctruthListHandle);
-
-    art::Ptr<simb::MCTruth> mctruth = mclist[0];
-    int n_genie_particles = mctruth->NParticles();
-
-    int k=0;
-    //MC_noFSIhadrons = n_genie_particles;
-    for( int j =0; j<n_genie_particles; ++j ){ 
-       simb::MCParticle particle = mctruth->GetParticle(j);
-       if( particle.StatusCode() == 14 ){
-         k ++;
-       }
-    }
-    MC_noFSIhadrons = k; //nomber of hadrons at the vertex i.e. before FSI
-    int no_FSI_index =0;
-    for( int j =0; j<n_genie_particles; ++j ){ 
-       simb::MCParticle particle = mctruth->GetParticle(j);
-       //cout<<"particle "<<particle.PdgCode()<<" "<<particle.Process()<<" "<<particle.StatusCode()<<endl;
-       if( particle.StatusCode() == 3 ){ //it should be only one decay!!
-         MC_ndk_pdg = particle.PdgCode();
-         const TLorentzVector& momentum = particle.Momentum(0);
-         momentum.GetXYZT(MC_ndkMomentum);             
-       }
-       if( particle.StatusCode() == 14 ){
-         MC_noFSIpdg[no_FSI_index] = particle.PdgCode();  //save particle info before FSI i.e. at the vertex
-         const TLorentzVector& momentum = particle.Momentum(0);
-         momentum.GetXYZT(MC_noFSIMomentum[no_FSI_index]);
-         no_FSI_index ++;
-       }
-    }
-
     isFiducial =insideFV( MC_vertex );
     if( !isFiducial ) return;
- 
     //========================================================================
     //========================================================================
     // Reco  stuff
@@ -449,8 +362,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     art::fill_ptr_vector(vtxlist, vtxListHandle);
     n_vertices = vtxlist.size();
 
-    //cout<<"Found these many vertices "<<n_vertices<<endl; 
-     for( int i =0; i<n_vertices; ++i){
+    for( int i =0; i<n_vertices; ++i){
        double tmp_vtx[3] ={};
        vtxlist[i]->XYZ(tmp_vtx);
        for( int j=0; j<3; ++j) vertex[i][j]=tmp_vtx[j];
@@ -466,15 +378,11 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     //T0
     art::FindMany<anab::T0>track_T0  (trackListHandle, event, fTrackModuleLabel);
     trkf::TrackMomentumCalculator trackP;
+    //cout<<"n_recoTracks "<<n_recoTracks<<endl;
     for(int i=0; i<n_recoTracks; ++i) {
-       //std::vector<art::Ptr<recob::Vertex>> kink_vertex_vec = kink_vertices.at(i);
-       //cout<<"Kink tracks "<<kink_vertex_vec.size()<<endl;
-       //cout<<"This track "<<i<<endl;
-       std::vector<const anab::T0*> T0 = track_T0.at(i);
-       //cout<<"size T0 "<<T0.size()<<endl; 
+       art::Ptr<recob::Track> track = tracklist[i];
        std::vector<art::Ptr<recob::Vertex>> trk_vtxlist = vtxFromtrack.at(i);
        n_vtxFrom_track[i] = trk_vtxlist.size(); 
-       art::Ptr<recob::Track> track = tracklist[i];
        track_length[i] = track->Length();
        const TVector3 tmp_track_vtx = track->Vertex();
        const TVector3 tmp_track_end = track->End();
@@ -490,8 +398,6 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
 
        track_Prange[i] = trackP.GetTrackMomentum(track_length[i],13); 
        track_myPrange[i] = myPrange( track_length[i]);
-       //track_multiScattChi2[i] = trackP.GetMomentumMultiScatterChi2(track);
-       //track_multiScattLLHD[i] = trackP.GetMomentumMultiScatterLLHD(track);
        double trk_end[4] ={tmp_track_end[0],tmp_track_end[1],tmp_track_end[2],-999};
        bool track_isInside = insideFV( trk_end );
        //check if the track ends within the FV
@@ -515,27 +421,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_mcID[i] = particle->TrackId();
        track_mcPDG[i] = particle->PdgCode();
        track_Efrac[i] = tmpEfrac; 
-       
     }
-
-    /*
-    //Save all hits in the event
-    art::Handle< std::vector<recob::Hit> > hitListHandle;
-    if (! event.getByLabel(fHitsModuleLabel, hitListHandle)) return;
-    std::vector<art::Ptr<recob::Hit> > hitlist;
-    art::fill_ptr_vector(hitlist, hitListHandle);
-    n_hits = hitlist.size();
-     
-    for(int i=0; i<n_hits; i++) {
-       art::Ptr<recob::Hit> hit = hitlist[i];
-       hit_channel[i] = hit->Channel();
-       hit_charge[i] = hit->Integral();
-       hit_peakT[i] = hit->PeakTime();        
-       hit_wireID[i] = hit->WireID().Wire;
-       hit_tpc[i] = hit->WireID().TPC;
-       hit_plane[i] = hit->WireID().Plane;
-    }
-    */ 
 
     //Showers... for background rejeciton?
     art::Handle<std::vector<recob::Shower>> showerHandle;
@@ -558,6 +444,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        for( size_t j =0; j<shower->MIPEnergy().size(); j++) sh_MIPenergy[i][j] = shower->MIPEnergy()[j];
        for( size_t j =0; j<shower->dEdx().size(); j++) sh_dEdx[i][j] = shower->dEdx()[j];
     }
+    
     /*
     //PDS info... this may be useful for background rejection
     art::Handle< std::vector<recob::OpFlash> > flashListHandle;
@@ -645,7 +532,7 @@ void NDKAna::cal ( std::vector<const anab::Calorimetry*> cal, double &dEdx, doub
   for( int PlaneHit=0; PlaneHit < (int)cal[best_plane]->dEdx().size(); ++PlaneHit ) { // loop through hits on each plane
      if( cal[best_plane]->ResidualRange()[PlaneHit] < fPIDA_endPoint ) { // Only want PIDA for last x cm
        dEdx += cal[best_plane]->dEdx()[PlaneHit]; 
-       PIDA += cal[best_plane]->dEdx()[PlaneHit]* pow(cal[best_plane]->ResidualRange()[PlaneHit], 0.41 ); 
+       PIDA += cal[best_plane]->dEdx()[PlaneHit]* pow(cal[best_plane]->ResidualRange()[PlaneHit], 0.42 ); 
        range +=cal[best_plane]->Range();
        res_range += cal[best_plane]->ResidualRange()[PlaneHit];
        ++UsedHits;
@@ -738,24 +625,18 @@ void NDKAna::reset(){
    MC_npart =-999; 
    n_recoTracks =-999;
    n_vertices = -999;
-   MC_ndk_pdg = -999; 
    for(int i = 0; i<4; ++i){
       MC_vertex[i] = -999.0;
-      MC_ndkMomentum[i] = -999.0;
    }
   
    for(int i=0; i<MAX_TRACKS; ++i) {
        MC_id[i] = -999;
        MC_pdg[i] = -999;
-       MC_noFSIpdg[i]    = -999;
        MC_mother[i] = -999;
-       MC_truthlength[i] = -999.0;
        MC_truthlength[i] = -999.0;
        track_PIDA[i] = -999.0;
        track_Prange[i] =-999.0;
        track_myPrange[i] =-999.0;
-       track_multiScattLLHD[i] =-999.0;
-       track_multiScattChi2[i] =-999.0;
        track_Efrac[i] = -999.0; 
        track_mcID[i] = -999;
        track_length[i] = -999;
@@ -767,7 +648,6 @@ void NDKAna::reset(){
           MC_endXYZT[i][j]        = -999.0;
           MC_startMomentum[i][j]  = -999.0;
           MC_endMomentum[i][j]    = -999.0;
-          MC_noFSIMomentum[i][j]  = -999.0;
 	  track_vtx[i][j] 	  = -999.0;
 	  track_end[i][j] 	  = -999.0;
        }
@@ -800,16 +680,6 @@ void NDKAna::reset(){
        flash_timewidth[i] = -999.0;
        flash_abstime[i] =-999;
        flash_frame[i] =-999;
-    }
-    n_hits =-999;
-    for(int i=0; i<MAX_HITS; ++i) {
-       hit_channel[i] = 0;
-       hit_peakT[i] = 0;
-       hit_charge[i] = 0;
-       hit_wireID[i] = 0;
-       hit_plane[i] = 0;
-       hit_tpc[i] =0;
-       hit_key[i] =0;
     }
     */
 }

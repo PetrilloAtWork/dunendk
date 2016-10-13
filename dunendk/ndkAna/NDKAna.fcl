@@ -37,9 +37,7 @@ physics:
       TrackModuleLabel: 	"pmtrack"
       OpFlashModuleLabel:	"opflash" 
       ShowerModuleLabel:        "emshower"
-      HitsModuleLabel:		"hitfd"
       PIDA_endPoint:		15.0
-      SaveMCTree:		true
       FidVolCutX:		10.0
       FidVolCutY:		10.0
       FidVolCutZ:		10.0
