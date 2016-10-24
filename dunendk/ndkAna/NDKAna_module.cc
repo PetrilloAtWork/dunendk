@@ -1,5 +1,6 @@
+//Module analyzer
 //Ana module for nucleon decay and atmospheric background analysis
-//Ana TTre contains MC truth info and Reconstruction 
+//Ana TTTre contains MC truth info and Reconstruction 
 //ahiguera@central.uh.edu
 
 
@@ -11,6 +12,7 @@
 #include "lardata/Utilities/GeometryUtilities.h"
 #include "larsim/Simulation/LArG4Parameters.h"
 #include "lardataobj/RecoBase/Track.h"
+#include "lardataobj/RecoBase/Cluster.h"  
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
 #include "larsim/MCCheater/BackTracker.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
@@ -42,9 +44,9 @@
 #include "TTree.h"
 #include "TDirectory.h"
 
-#define MAX_TRACKS 1000
-#define MAX_FLASHES 1000
-#define MAX_SHOWERS 1000
+#define MAX_TRACKS 200
+#define MAX_FLASHES 200
+#define MAX_SHOWERS 200
 
 using namespace std;
 
@@ -108,7 +110,6 @@ private:
     double vertex[MAX_TRACKS][4];
     int    n_recoTracks;
     int    track_isContained[MAX_TRACKS];
-    int    n_vtxFrom_track[MAX_TRACKS];
     double track_vtx[MAX_TRACKS][4];
     double track_end[MAX_TRACKS][4];
     double track_length[MAX_TRACKS]; 
@@ -120,6 +121,22 @@ private:
     double track_Efrac[MAX_TRACKS];
     int    track_mcID[MAX_TRACKS];
     int    track_mcPDG[MAX_TRACKS];
+
+    int    n_NDKrecoTracks;
+    double track_NDKvtx[MAX_TRACKS][4];
+    double track_NDKend[MAX_TRACKS][4];
+    int    track_NDK_isContained[MAX_TRACKS];
+    double track_NDK_length[MAX_TRACKS]; 
+    double track_NDK_dir_vtx[MAX_TRACKS][4]; 
+    double track_NDK_PIDA[MAX_TRACKS];
+    double track_NDK_KE[MAX_TRACKS];
+    double track_NDK_Prange[MAX_TRACKS];
+    double track_NDK_myPrange[MAX_TRACKS];
+    double track_NDK_Efrac[MAX_TRACKS];
+    int    track_NDK_mcID[MAX_TRACKS];
+    int    track_NDK_mcPDG[MAX_TRACKS];
+
+
 
 
     int    n_recoShowers;
@@ -233,8 +250,10 @@ void NDKAna::beginJob(){
 	   <<fFidVolYmin<<"\t< y <\t"<<fFidVolYmax<<"\n"
 	   <<fFidVolZmin<<"\t< z <\t"<<fFidVolZmax<<"\n";
 
+  
   art::ServiceHandle<art::TFileService> tfs;
   fEventTree = tfs->make<TTree>("Event", "Event Tree from Sim & Reco");
+  
   fEventTree->Branch("eventNo", &Event);
   fEventTree->Branch("runNo", &Run);
   fEventTree->Branch("subRunNo", &SubRun);
@@ -255,7 +274,6 @@ void NDKAna::beginJob(){
   fEventTree->Branch("n_reco_tracks", &n_recoTracks);
   fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
   fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
-  fEventTree->Branch("n_vtxFrom_track", &n_vtxFrom_track, "n_vtxFrom_track[n_reco_tracks]/I");
   fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
   fEventTree->Branch("track_length", &track_length,"track_length[n_reco_tracks]/D");
   fEventTree->Branch("track_PIDA", &track_PIDA,"track_PIDA[n_reco_tracks]/D");
@@ -266,6 +284,21 @@ void NDKAna::beginJob(){
   fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");
   fEventTree->Branch("track_mcPDG", &track_mcPDG,"track_mcPDG[n_reco_tracks]/I");
 
+  fEventTree->Branch("n_NDKreco_tracks", &n_NDKrecoTracks);
+  fEventTree->Branch("track_NDKvtx", &track_NDKvtx,"track_NDKvtx[n_NDKreco_tracks][4]/D");
+  fEventTree->Branch("track_NDKend", &track_NDKend,"track_NDKend[n_NDKreco_tracks][4]/D");
+  fEventTree->Branch("track_NDK_isContained", &track_NDK_isContained,"track_NDK_isContained[n_NDKreco_tracks]/I");
+  fEventTree->Branch("track_NDK_length", &track_NDK_length,"track_NDK_length[n_NDKreco_tracks]/D");
+  fEventTree->Branch("track_NDK_PIDA", &track_NDK_PIDA,"track_NDK_PIDA[n_NDKreco_tracks]/D");
+  fEventTree->Branch("track_NDK_KE", &track_NDK_KE,"track_NDK_KE[n_NDKreco_tracks]/D");
+  fEventTree->Branch("track_NDK_Prange", &track_NDK_Prange,"track_NDK_Prange[n_NDKreco_tracks]/D");
+  fEventTree->Branch("track_NDK_myPrange", &track_NDK_myPrange,"track_NDK_myPrange[n_NDKreco_tracks]/D");
+  fEventTree->Branch("track_NDK_Efrac", &track_NDK_Efrac,"track_NDK_Efrac[n_NDKreco_tracks]/D");
+  fEventTree->Branch("track_NDK_mcID", &track_NDK_mcID,"track_NDK_mcID[n_NDKreco_tracks]/I");
+  fEventTree->Branch("track_NDK_mcPDG", &track_NDK_mcPDG,"track_NDK_mcPDG[n_NDKreco_tracks]/I");
+
+
+/*
   fEventTree->Branch("n_showers", &n_recoShowers);
   fEventTree->Branch("sh_direction_X", &sh_direction_X, "sh_direction_X[n_showers]/D");
   fEventTree->Branch("sh_direction_Y", &sh_direction_Y, "sh_direction_Y[n_showers]/D");
@@ -287,12 +320,12 @@ void NDKAna::beginJob(){
   fEventTree->Branch("flash_ywidth", &flash_ywidth,"flash_ywidth[n_flashes]/D");
   fEventTree->Branch("flash_zwidth", &flash_zwidth,"flash_zwidth[n_flashes]/D");
   fEventTree->Branch("flash_timewidth", &flash_timewidth, "flash_timewidth[n_flashes]/D");
-
+  */ 
+  
 
 }
 //========================================================================
 void NDKAna::endJob(){
-     
 }
 //========================================================================
 void NDKAna::beginRun(const art::Run& /*run*/){
@@ -342,6 +375,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     
     isFiducial =insideFV( MC_vertex );
     if( !isFiducial ) return;
+
     //========================================================================
     //========================================================================
     // Reco  stuff
@@ -349,40 +383,31 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     //========================================================================
     //this is a track base analysis so it must be at least one track
     art::Handle< std::vector<recob::Track> > trackListHandle;
-    if(! event.getByLabel(fTrackModuleLabel, trackListHandle)) return;
     std::vector<art::Ptr<recob::Track>> tracklist;
-    art::fill_ptr_vector(tracklist, trackListHandle);
+    if( event.getByLabel(fTrackModuleLabel, trackListHandle)); 
+      art::fill_ptr_vector(tracklist, trackListHandle);
+
     n_recoTracks = tracklist.size();
     if( n_recoTracks > MAX_TRACKS ) return;
-    //cout<<"Found these many reco tracks "<<n_recoTracks<<endl;
     
     art::Handle< std::vector<recob::Vertex> > vtxListHandle;
     std::vector<art::Ptr<recob::Vertex>> vtxlist;
-    if(!event.getByLabel(fTrackModuleLabel, vtxListHandle)) return;
+    if(!event.getByLabel(fTrackModuleLabel, vtxListHandle)) return; 
     art::fill_ptr_vector(vtxlist, vtxListHandle);
     n_vertices = vtxlist.size();
 
     for( int i =0; i<n_vertices; ++i){
-       double tmp_vtx[3] ={};
+       double tmp_vtx[3] ={-999.0,-999.0,-999.0};
        vtxlist[i]->XYZ(tmp_vtx);
        for( int j=0; j<3; ++j) vertex[i][j]=tmp_vtx[j];
     } 
-
-    //art::FindManyP<recob::Vertex> kink_vertices(trackListHandle, event, art::InputTag("pmtrack","kink"));
     art::FindManyP<recob::Hit> track_hits(trackListHandle, event, fTrackModuleLabel);
-    art::FindManyP<recob::Vertex> vtxFromtrack(trackListHandle, event, fTrackModuleLabel);
-    //cal dE/dx
     std::string calo_ModuleLabel = fTrackModuleLabel;
     calo_ModuleLabel +="calo";
     art::FindMany<anab::Calorimetry>  reco_cal(trackListHandle, event, calo_ModuleLabel);
-    //T0
-    art::FindMany<anab::T0>track_T0  (trackListHandle, event, fTrackModuleLabel);
     trkf::TrackMomentumCalculator trackP;
-    //cout<<"n_recoTracks "<<n_recoTracks<<endl;
     for(int i=0; i<n_recoTracks; ++i) {
        art::Ptr<recob::Track> track = tracklist[i];
-       std::vector<art::Ptr<recob::Vertex>> trk_vtxlist = vtxFromtrack.at(i);
-       n_vtxFrom_track[i] = trk_vtxlist.size(); 
        track_length[i] = track->Length();
        const TVector3 tmp_track_vtx = track->Vertex();
        const TVector3 tmp_track_end = track->End();
@@ -403,8 +428,6 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        //check if the track ends within the FV
        if( track_isInside ) track_isContained[i] =1;
        else track_isContained[i] =0;
-       //bool track_isFiducial = insideFV( track_vtx );
-       //if( !track_isFiducial ) continue;
        std::vector<art::Ptr<recob::Hit>> all_trackHits = track_hits.at(i);  
        //call dEdx
        std::vector<const anab::Calorimetry*> trk_cal = reco_cal.at(i);
@@ -423,6 +446,59 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_Efrac[i] = tmpEfrac; 
     }
 
+    //========================================================================
+    // NDK Reco  stuff
+    //========================================================================
+    art::Handle< std::vector<recob::Track> > trackListNDKHandle;
+    std::vector<art::Ptr<recob::Track>> trackNDKlist;
+    if(! event.getByLabel("pmtrackNDK", trackListNDKHandle)) return;
+    art::fill_ptr_vector(trackNDKlist, trackListNDKHandle);
+    n_NDKrecoTracks  = trackNDKlist.size();
+
+    art::FindManyP<recob::Hit> trackNDK_hits(trackListNDKHandle, event,"pmtrackNDK" );
+    art::FindMany<anab::Calorimetry>  reco_NDKcal(trackListNDKHandle, event, "pmtrackNDKcalo");
+
+    for(int i=0; i<n_NDKrecoTracks; ++i) {
+       art::Ptr<recob::Track> track = trackNDKlist[i];
+       track_NDK_length[i] = track->Length();
+       const TVector3 tmp_track_vtx = track->Vertex();
+       const TVector3 tmp_track_end = track->End();
+       track_NDKvtx[i][0] =tmp_track_vtx[0];
+       track_NDKvtx[i][1] =tmp_track_vtx[1];
+       track_NDKvtx[i][2] =tmp_track_vtx[2];
+       track_NDKvtx[i][3] = -999.0;
+
+       track_NDKend[i][0] =tmp_track_end[0];
+       track_NDKend[i][1] =tmp_track_end[1];
+       track_NDKend[i][2] =tmp_track_end[2];
+       track_NDKend[i][3] = -999.0;
+
+       track_NDK_Prange[i] = trackP.GetTrackMomentum(track_NDK_length[i],13); 
+       track_NDK_myPrange[i] = myPrange( track_NDK_length[i]);
+       double trk_end[4] ={tmp_track_end[0],tmp_track_end[1],tmp_track_end[2],-999};
+       bool track_isInside = insideFV( trk_end );
+       //check if the track ends within the FV
+       if( track_isInside ) track_NDK_isContained[i] =1;
+       else track_NDK_isContained[i] =0;
+       std::vector<art::Ptr<recob::Hit>> all_trackHits = trackNDK_hits.at(i);  
+       //call dEdx
+       std::vector<const anab::Calorimetry*> trk_cal = reco_NDKcal.at(i);
+       double PID_dEdx, range, res_range;// PIDA;
+       double PIDA =-999.0;
+       double KE =-999.0;
+       cal(trk_cal, PID_dEdx, range, res_range, PIDA, KE); 
+       track_NDK_PIDA[i] = PIDA;
+       track_NDK_KE[i] = KE;
+       double tmpEfrac = 0;
+       const simb::MCParticle *particle;
+       truthMatcher( all_trackHits, particle, tmpEfrac );
+       if(!particle) continue;
+       track_NDK_mcID[i] = particle->TrackId();
+       track_NDK_mcPDG[i] = particle->PdgCode();
+       track_NDK_Efrac[i] = tmpEfrac; 
+    }
+    /*
+   
     //Showers... for background rejeciton?
     art::Handle<std::vector<recob::Shower>> showerHandle;
     if(!event.getByLabel(fShowerModuleLabel,showerHandle)) return;
@@ -445,7 +521,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        for( size_t j =0; j<shower->dEdx().size(); j++) sh_dEdx[i][j] = shower->dEdx()[j];
     }
     
-    /*
+    
     //PDS info... this may be useful for background rejection
     art::Handle< std::vector<recob::OpFlash> > flashListHandle;
     std::vector<art::Ptr<recob::OpFlash> > flashlist;
@@ -624,6 +700,7 @@ void NDKAna::reset(){
 
    MC_npart =-999; 
    n_recoTracks =-999;
+   n_NDKrecoTracks =-999;
    n_vertices = -999;
    for(int i = 0; i<4; ++i){
       MC_vertex[i] = -999.0;
@@ -643,6 +720,16 @@ void NDKAna::reset(){
        track_isContained[i]= -999;
        track_mcPDG[i] =-999;
        track_KE[i] =-999.0;
+
+       track_NDK_PIDA[i] = -999.0;
+       track_NDK_Prange[i] =-999.0;
+       track_NDK_myPrange[i] =-999.0;
+       track_NDK_Efrac[i] = -999.0; 
+       track_NDK_mcID[i] = -999;
+       track_NDK_length[i] = -999;
+       track_NDK_isContained[i]= -999;
+       track_NDK_mcPDG[i] =-999;
+       track_NDK_KE[i] =-999.0;
        for(int j=0; j<4; ++j) {
           MC_startXYZT[i][j]      = -999.0;
           MC_endXYZT[i][j]        = -999.0;
@@ -650,8 +737,12 @@ void NDKAna::reset(){
           MC_endMomentum[i][j]    = -999.0;
 	  track_vtx[i][j] 	  = -999.0;
 	  track_end[i][j] 	  = -999.0;
+	  track_NDKvtx[i][j] 	  = -999.0;
+	  track_NDKend[i][j] 	  = -999.0;
+      
        }
     }
+    /*
     n_recoShowers = -999;
     for(int i=0; i<MAX_SHOWERS; ++i){
       sh_direction_X[i] = -999.0;
@@ -668,7 +759,6 @@ void NDKAna::reset(){
          sh_dEdx[i][j] = -999.0;
       }
     } 
-    /*
     n_flashes =-999;
     for(int i=0; i<MAX_FLASHES; ++i){
        flash_time[i] =-999.0;
