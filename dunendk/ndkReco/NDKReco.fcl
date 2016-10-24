@@ -1,0 +1,49 @@
+#include "services_dune.fcl"
+#include "clusteralgorithms.fcl"
+process_name: NDKReco 
+
+services:
+{
+  TFileService: { fileName: "test.root" }
+  TimeTracker:       {}
+  message: @local::standard_info
+  user:         @local::dunefd_simulation_services
+}
+services.user.Geometry: @local::dune10kt_1x2x6_geo
+
+source:
+{
+  module_type: RootInput
+  firstEvent : 1
+  maxEvents: 10
+}
+
+
+physics:
+{
+  producers:
+  {
+    NDKReco: 
+    {
+      module_type:      	"NDKReco"
+      TrackModuleLabel: 	"pmtrack"
+      DBScanAlg:       @local::standard_dbscanalg
+    }
+ 
+  } 
+  reco: [NDKReco]
+  stream1:  [ out1 ]
+  trigger_paths: [reco]
+  end_paths: [ stream1 ]
+}
+
+outputs:
+{
+ out1:
+ {
+   module_type: RootOutput
+   fileName:    "%ifb_reco.root"
+   dataTier:    "full-reconstructed"
+   compressionLevel: 1
+ }
+}
