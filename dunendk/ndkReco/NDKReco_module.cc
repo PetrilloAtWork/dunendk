@@ -1,5 +1,10 @@
-
-
+////////////////////////////////////////////////////////////////////////
+//Producer module (DBClusters)
+//Attempt to recover kaons that were mergend into a muon track like
+//1) newHit vector from high ionization hits in the longest track (muon)
+//2) produce DBClusters to be used latter   
+// Aaron Higuera
+// ahiguera@central.uh.edu
 
 // LArSoft includes
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
@@ -54,6 +59,8 @@ private:
 
     // the parameters we'll read from the .fcl
     std::string fTrackModuleLabel;
+    double fDistancetoClean;
+    double fHitIntegralMIPlike;
     
     DBScanAlg fDBScan;
 }; 
@@ -74,6 +81,8 @@ NDKReco::~NDKReco(){
 void NDKReco::reconfigure(fhicl::ParameterSet const& p){
 
     fTrackModuleLabel    = p.get<std::string>("TrackModuleLabel");
+    fDistancetoClean	 = p.get<double>("DistancetoClean");
+    fHitIntegralMIPlike  = p.get<double>("HitIntegralMIPlike");
     fDBScan.reconfigure(p.get< fhicl::ParameterSet >("DBScanAlg"));
 }
 //========================================================================
@@ -118,11 +127,11 @@ void NDKReco::produce(art::Event& event ){
        double dis_start = sqrt(pow(hit_spts[0]->XYZ()[0]-startTrk[0],2)+ pow(hit_spts[0]->XYZ()[1]-startTrk[1],2)+pow(hit_spts[0]->XYZ()[2]-startTrk[2],2));
        double dis_end = sqrt(pow(hit_spts[0]->XYZ()[0]-endTrk[0],2)+ pow(hit_spts[0]->XYZ()[1]-endTrk[1],2)+pow(hit_spts[0]->XYZ()[2]-endTrk[2],2));
        art::Ptr<recob::Hit> hit = mu_trackHits[i];
-       if( dis_start < 10.0 ){
-         if( hit->Integral() > 250.0 ) hits_after_cleaning.push_back(hit);
+       if( dis_start < fDistancetoClean ){
+         if( hit->Integral() > fHitIntegralMIPlike ) hits_after_cleaning.push_back(hit);
        }
-       else if( dis_end < 10.0){
-         if( hit->Integral() > 250.0 ) hits_after_cleaning.push_back(hit);
+       else if( dis_end < fDistancetoClean ){
+         if( hit->Integral() > fHitIntegralMIPlike ) hits_after_cleaning.push_back(hit);
        }
     }
   
