@@ -5,6 +5,7 @@ process_name: NDKReco
 services:
 {
   TFileService: { fileName: "test.root" }
+  MemoryTracker:     {}
   TimeTracker:       {}
   message: @local::standard_info
   user:         @local::dunefd_simulation_services
@@ -15,18 +16,21 @@ source:
 {
   module_type: RootInput
   firstEvent : 1
-  maxEvents: 10
+  maxEvents: -1
 }
 
 
 physics:
 {
+
   producers:
   {
     NDKReco: 
     {
       module_type:      	"NDKReco"
       TrackModuleLabel: 	"pmtrack"
+      HitIntegralMIPlike:       250.0
+      DistancetoClean:	        10.0 
       DBScanAlg:       @local::standard_dbscanalg
     }
  
@@ -36,13 +40,12 @@ physics:
   trigger_paths: [reco]
   end_paths: [ stream1 ]
 }
-
 outputs:
 {
  out1:
  {
    module_type: RootOutput
-   fileName:    "%ifb_reco.root"
+   fileName:    "test.root"
    dataTier:    "full-reconstructed"
    compressionLevel: 1
  }

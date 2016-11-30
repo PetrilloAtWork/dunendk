@@ -3,7 +3,8 @@
 //Attempt to recover kaons that were mergend into a muon track like
 //1) newHit vector from high ionization hits in the longest track (muon)
 //2) produce DBClusters to be used latter   
-// Aaron Higuera
+//   the ultimate goal is recover some tracks that overlap see
+//   https://indico.fnal.gov/getFile.py/access?contribId=4&resId=0&materialId=slides&confId=13197 for more details
 // ahiguera@central.uh.edu
 
 // LArSoft includes
