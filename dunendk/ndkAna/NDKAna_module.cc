@@ -45,8 +45,8 @@
 #include "TDirectory.h"
 
 #define MAX_TRACKS 200
-#define MAX_FLASHES 200
-#define MAX_SHOWERS 200
+#define MAX_FLASHES 100
+#define MAX_SHOWERS 100
 
 using namespace std;
 
@@ -68,7 +68,7 @@ public:
     void reconfigure(fhicl::ParameterSet const& pset);
 
     void Process(const art::Event& evt, bool &isFiducial);
-    void truthMatcher( std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac);
+    void truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac, double &Ecomplet);
     double myPrange( double track_range );
     double truthLength( const simb::MCParticle *MCparticle );
     void cal( std::vector<const anab::Calorimetry*> cal, double &dEdx, double &range, double &res_range, double &PIDA, double &KE );
@@ -119,6 +119,7 @@ private:
     double track_Prange[MAX_TRACKS];
     double track_myPrange[MAX_TRACKS];
     double track_Efrac[MAX_TRACKS];
+    double track_complet[MAX_TRACKS];
     int    track_mcID[MAX_TRACKS];
     int    track_mcPDG[MAX_TRACKS];
 
@@ -133,6 +134,7 @@ private:
     double track_NDK_Prange[MAX_TRACKS];
     double track_NDK_myPrange[MAX_TRACKS];
     double track_NDK_Efrac[MAX_TRACKS];
+    double track_NDK_complet[MAX_TRACKS];
     int    track_NDK_mcID[MAX_TRACKS];
     int    track_NDK_mcPDG[MAX_TRACKS];
 
@@ -280,6 +282,7 @@ void NDKAna::beginJob(){
   fEventTree->Branch("track_KE", &track_KE,"track_KE[n_reco_tracks]/D");
   fEventTree->Branch("track_Prange", &track_Prange,"track_Prange[n_reco_tracks]/D");
   fEventTree->Branch("track_myPrange", &track_myPrange,"track_myPrange[n_reco_tracks]/D");
+  fEventTree->Branch("track_complet", &track_complet,"track_complet[n_reco_tracks]/D");
   fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");
   fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");
   fEventTree->Branch("track_mcPDG", &track_mcPDG,"track_mcPDG[n_reco_tracks]/I");
@@ -294,11 +297,10 @@ void NDKAna::beginJob(){
   fEventTree->Branch("track_NDK_Prange", &track_NDK_Prange,"track_NDK_Prange[n_NDKreco_tracks]/D");
   fEventTree->Branch("track_NDK_myPrange", &track_NDK_myPrange,"track_NDK_myPrange[n_NDKreco_tracks]/D");
   fEventTree->Branch("track_NDK_Efrac", &track_NDK_Efrac,"track_NDK_Efrac[n_NDKreco_tracks]/D");
+  fEventTree->Branch("track_NDK_complet", &track_NDK_complet,"track_NDK_complet[n_NDKreco_tracks]/D");
   fEventTree->Branch("track_NDK_mcID", &track_NDK_mcID,"track_NDK_mcID[n_NDKreco_tracks]/I");
   fEventTree->Branch("track_NDK_mcPDG", &track_NDK_mcPDG,"track_NDK_mcPDG[n_NDKreco_tracks]/I");
 
-
-/*
   fEventTree->Branch("n_showers", &n_recoShowers);
   fEventTree->Branch("sh_direction_X", &sh_direction_X, "sh_direction_X[n_showers]/D");
   fEventTree->Branch("sh_direction_Y", &sh_direction_Y, "sh_direction_Y[n_showers]/D");
@@ -312,6 +314,7 @@ void NDKAna::beginJob(){
   fEventTree->Branch("sh_bestplane", &sh_bestplane, "sh_bestplane[n_showers]/I");
   fEventTree->Branch("sh_length", &sh_length, "sh_length[n_showers]/D");
 
+/*
   fEventTree->Branch("n_flashes", &n_flashes);
   fEventTree->Branch("flash_time", &flash_time,"flash_time[n_flashes]/D");
   fEventTree->Branch("flash_pe", &flash_pe,"flash_pe[n_flashes]/D");
@@ -388,7 +391,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
       art::fill_ptr_vector(tracklist, trackListHandle);
 
     n_recoTracks = tracklist.size();
-    if( n_recoTracks > MAX_TRACKS ) return;
+    if( n_recoTracks > MAX_TRACKS || n_recoTracks == 0) return;
     
     art::Handle< std::vector<recob::Vertex> > vtxListHandle;
     std::vector<art::Ptr<recob::Vertex>> vtxlist;
@@ -406,6 +409,12 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     calo_ModuleLabel +="calo";
     art::FindMany<anab::Calorimetry>  reco_cal(trackListHandle, event, calo_ModuleLabel);
     trkf::TrackMomentumCalculator trackP;
+
+    std::vector<art::Ptr<recob::Hit>> tmp_all_trackHits = track_hits.at(0);  
+    std::vector<art::Ptr<recob::Hit>> all_hits;
+    art::Handle<std::vector<recob::Hit>> hithandle;
+    if(event.get(tmp_all_trackHits[0].id(), hithandle))  art::fill_ptr_vector(all_hits, hithandle);
+
     for(int i=0; i<n_recoTracks; ++i) {
        art::Ptr<recob::Track> track = tracklist[i];
        track_length[i] = track->Length();
@@ -439,24 +448,37 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_KE[i] = KE;
        double tmpEfrac = 0;
        const simb::MCParticle *particle;
-       truthMatcher( all_trackHits, particle, tmpEfrac );
+       double tmpComplet = 0;
+       truthMatcher( all_hits,  all_trackHits, particle, tmpEfrac, tmpComplet );
        if(!particle) continue;
        track_mcID[i] = particle->TrackId();
        track_mcPDG[i] = particle->PdgCode();
        track_Efrac[i] = tmpEfrac; 
+       track_complet[i] = tmpComplet;
     }
 
+    
     //========================================================================
     // NDK Reco  stuff
     //========================================================================
+    //This part is for new track reconstruction in addition to the standard one
+    //It is still under development, see https://indico.fnal.gov/getFile.py/access?contribId=4&resId=0&materialId=slides&confId=13197 for more details 
     art::Handle< std::vector<recob::Track> > trackListNDKHandle;
     std::vector<art::Ptr<recob::Track>> trackNDKlist;
     if(! event.getByLabel("pmtrackNDK", trackListNDKHandle)) return;
     art::fill_ptr_vector(trackNDKlist, trackListNDKHandle);
     n_NDKrecoTracks  = trackNDKlist.size();
 
+    if( n_NDKrecoTracks > MAX_TRACKS || n_NDKrecoTracks == 0) return;
+
     art::FindManyP<recob::Hit> trackNDK_hits(trackListNDKHandle, event,"pmtrackNDK" );
     art::FindMany<anab::Calorimetry>  reco_NDKcal(trackListNDKHandle, event, "pmtrackNDKcalo");
+
+    std::vector<art::Ptr<recob::Hit>> tmp_all_NDKtrackHits = trackNDK_hits.at(0);  
+    std::vector<art::Ptr<recob::Hit>> all_NDKhits;
+    art::Handle<std::vector<recob::Hit>> NDKhithandle;
+    if(event.get(tmp_all_NDKtrackHits[0].id(), NDKhithandle))  art::fill_ptr_vector(all_NDKhits, NDKhithandle);
+
 
     for(int i=0; i<n_NDKrecoTracks; ++i) {
        art::Ptr<recob::Track> track = trackNDKlist[i];
@@ -489,16 +511,19 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        cal(trk_cal, PID_dEdx, range, res_range, PIDA, KE); 
        track_NDK_PIDA[i] = PIDA;
        track_NDK_KE[i] = KE;
-       double tmpEfrac = 0;
+       double tmpEfrac = 0.0;
+       double tmpComplet =0.0;
        const simb::MCParticle *particle;
-       truthMatcher( all_trackHits, particle, tmpEfrac );
+       truthMatcher( all_NDKhits,  all_trackHits, particle, tmpEfrac, tmpComplet );
        if(!particle) continue;
        track_NDK_mcID[i] = particle->TrackId();
        track_NDK_mcPDG[i] = particle->PdgCode();
        track_NDK_Efrac[i] = tmpEfrac; 
+       track_NDK_complet[i] = tmpComplet;
+ 
     }
-    /*
-   
+
+    
     //Showers... for background rejeciton?
     art::Handle<std::vector<recob::Shower>> showerHandle;
     if(!event.getByLabel(fShowerModuleLabel,showerHandle)) return;
@@ -521,7 +546,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        for( size_t j =0; j<shower->dEdx().size(); j++) sh_dEdx[i][j] = shower->dEdx()[j];
     }
     
-    
+    /* 
     //PDS info... this may be useful for background rejection
     art::Handle< std::vector<recob::OpFlash> > flashListHandle;
     std::vector<art::Ptr<recob::OpFlash> > flashlist;
@@ -544,18 +569,19 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
 
 }
 //========================================================================
-void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac){
+void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac, double &Ecomplet){
 
-    //cout<<"truthMatcher..."<<endl;
+    //std::cout<<"truthMatcher..."<<std::endl;
     art::ServiceHandle<cheat::BackTracker> bt;
     std::map<int,double> trkID_E;
     for(size_t j = 0; j < track_hits.size(); ++j){
        art::Ptr<recob::Hit> hit = track_hits[j];
        std::vector<sim::TrackIDE> TrackIDs = bt->HitToTrackID(hit);
-       for(size_t k = 0; k < TrackIDs.size(); ++k){
+       for(size_t k = 0; k < TrackIDs.size(); k++){
           trkID_E[TrackIDs[k].trackID] += TrackIDs[k].energy;
        }            
     }
+    double E_em =0.0;
     double max_E = -999.0;
     double total_E = 0.0;
     int TrackID = -999;
@@ -572,12 +598,29 @@ void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> track_hits, const s
          partial_E = ii->second;
          max_E = ii->second;
          TrackID = ii->first;
+         if( TrackID < 0 ) E_em += ii->second;
        }
     } 
-
     MCparticle = bt->TrackIDToParticle(TrackID);
-    Efrac = partial_E/total_E;
-    //std::cout<<"total "<<total_E<<" frac "<<Efrac<<" which particle "<<MCparticle->PdgCode()<<std::endl;
+
+    //In the current simulation, we do not save EM Shower daughters in GEANT. But we do save the energy deposition in TrackIDEs. If the energy deposition is from a particle that is the daughter of 
+    //an EM particle, the negative of the parent track ID is saved in TrackIDE for the daughter particle
+    //we don't want to track gammas or any other EM activity 
+    if( TrackID < 0 ) return;
+
+    //Efrac = (partial_E+E_em)/total_E;
+    Efrac = (partial_E)/total_E;
+
+    //completeness
+    double totenergy =0;
+    for(size_t k = 0; k < all_hits.size(); ++k){
+       art::Ptr<recob::Hit> hit = all_hits[k];
+       std::vector<sim::TrackIDE> TrackIDs = bt->HitToTrackID(hit);
+       for(size_t l = 0; l < TrackIDs.size(); ++l){
+          if(TrackIDs[l].trackID==TrackID) totenergy += TrackIDs[l].energy;
+       }
+    } 
+    Ecomplet = partial_E/totenergy;
 }
 
 //========================================================================
@@ -698,10 +741,10 @@ bool NDKAna::insideFV( double vertex[4]){
 //========================================================================
 void NDKAna::reset(){
 
-   MC_npart =-999; 
-   n_recoTracks =-999;
-   n_NDKrecoTracks =-999;
-   n_vertices = -999;
+   MC_npart =0; 
+   n_recoTracks =0;
+   n_NDKrecoTracks =0;
+   n_vertices = 0;
    for(int i = 0; i<4; ++i){
       MC_vertex[i] = -999.0;
    }
@@ -715,6 +758,7 @@ void NDKAna::reset(){
        track_Prange[i] =-999.0;
        track_myPrange[i] =-999.0;
        track_Efrac[i] = -999.0; 
+       track_complet[i] =-999.0;
        track_mcID[i] = -999;
        track_length[i] = -999;
        track_isContained[i]= -999;
@@ -725,6 +769,7 @@ void NDKAna::reset(){
        track_NDK_Prange[i] =-999.0;
        track_NDK_myPrange[i] =-999.0;
        track_NDK_Efrac[i] = -999.0; 
+       track_NDK_complet[i] = -999.0;
        track_NDK_mcID[i] = -999;
        track_NDK_length[i] = -999;
        track_NDK_isContained[i]= -999;
@@ -742,8 +787,7 @@ void NDKAna::reset(){
       
        }
     }
-    /*
-    n_recoShowers = -999;
+    n_recoShowers = 0;
     for(int i=0; i<MAX_SHOWERS; ++i){
       sh_direction_X[i] = -999.0;
       sh_direction_Y[i] = -999.0;
@@ -759,7 +803,8 @@ void NDKAna::reset(){
          sh_dEdx[i][j] = -999.0;
       }
     } 
-    n_flashes =-999;
+    /*
+    n_flashes =0;
     for(int i=0; i<MAX_FLASHES; ++i){
        flash_time[i] =-999.0;
        flash_pe[i] =-999.0;
