@@ -13,7 +13,7 @@ art_make(
                            lardataobj_RecoBase
                            larcore_Geometry
                            larcore_Geometry_Geometry_service
-                           larsim_RandomUtils_LArSeedService_service
+	  		   larsim_Simulation nutools_ParticleNavigation lardataobj_Simulation
                            ${ART_FRAMEWORK_CORE}
                            ${ART_FRAMEWORK_PRINCIPAL}
                            ${ART_FRAMEWORK_SERVICES_REGISTRY}
