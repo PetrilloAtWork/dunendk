@@ -28,7 +28,10 @@ class Experiment(object):
     def sensitivity(self, exposure, clc):
         """Return the experiment's partial lifetime sensitivity for this NDK decay mode."""
         aul = clc.AverageUpperLimit(self.Nbkg(exposure))
-        return self.source.protonsperunitmass*self.eff*exposure/aul
+        if self.mode.nucleonpdg == 2212:
+            return self.source.protonsperunitmass*self.eff*exposure/aul
+        else:
+            return self.source.neutronsperunitmass*self.eff*exposure/aul
 
 
 ############################################################

@@ -8,12 +8,12 @@ import math
 class Mode(object):
     """docstring for Mode"""
 
-    def __init__(self, symbol, name, pdgnumber, nucleontype, pdglimit): 
+    def __init__(self, symbol, name, pdgnumber, nucleonpdg, pdglimit): 
         super(Mode, self).__init__()
         self.symbol = symbol
         self.name = name
         self.pdgnumber = pdgnumber
-        self.nucleontype = nucleontype
+        self.nucleonpdg = nucleonpdg
         self.pdglimit = pdglimit
 
 
@@ -28,25 +28,25 @@ class Mode(object):
 symbol = 'p1'
 name = 'p2epluspizero'
 pdglimit = 8200.E30*units.year
-p1 = Mode(symbol, name, 1, 0, pdglimit)
+p1 = Mode(symbol, name, 1, 2212, pdglimit)
 
 ### n1
 symbol = 'n1'
 name = 'n2epluspiminus'
 pdglimit = 2000.E30*units.year
-n1 = Mode(symbol, name, 1, 1, pdglimit)
+n1 = Mode(symbol, name, 1, 2112, pdglimit)
 
 ### p16
 symbol = 'p16'
 name = 'p2mupluskzero'
 pdglimit = 1600.E30*units.year
-p16 = Mode(symbol, name, 16, 0, pdglimit)
+p16 = Mode(symbol, name, 16, 2212, pdglimit)
 
 ### p19
 symbol = 'p19'
 name = 'p2nubarkplus'
 pdglimit = 5900.E30*units.year
-p19 = Mode(symbol, name, 19, 0, pdglimit)
+p19 = Mode(symbol, name, 19, 2212, pdglimit)
 
 
 ### ANTILEPTON + MULTIPLE MESONS MODES
@@ -59,13 +59,13 @@ p19 = Mode(symbol, name, 19, 0, pdglimit)
 symbol = 'n34'
 name = 'n2eminuskplus'
 pdglimit = 32.E30*units.year
-n34 = Mode(symbol, name, 34, 1, pdglimit)
+n34 = Mode(symbol, name, 34, 2112, pdglimit)
 
 ### p41
 symbol = 'p41'
 name = 'p2muminuspipluskplus'
 pdglimit = 245.E30*units.year 
-p41 = Mode(symbol, name, 41, 0, pdglimit)
+p41 = Mode(symbol, name, 41, 2212, pdglimit)
 
 ##############################
 ### DICTIONARY ###############
