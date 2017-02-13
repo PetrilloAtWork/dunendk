@@ -20,7 +20,7 @@ class Mode(object):
 ############################################################
 ### NUCLEON DECAY MODES --- DATABASE
 
-### The decay mode numbering scheme adopted matches the one of the Particle Data Group, see: http://pdg.lbl.gov/2015/listings/rpp2015-list-p.pdf. The existing limits are taken from the same source.
+### The decay mode numbering scheme adopted matches the one of the Particle Data Group, see: http://pdg.lbl.gov/2016/listings/rpp2016-list-p.pdf. The existing limits are taken from the same source.
 
 ### ANTILEPTON + SINGLE MESON MODES
 
