@@ -1,6 +1,6 @@
 //Module analyzer
 //Ana module for nucleon decay and atmospheric background analysis
-//Ana TTTre contains MC truth info and Reconstruction 
+//Ana TTree contains MC truth info and Reconstruction 
 //ahiguera@central.uh.edu
 
 
@@ -85,6 +85,7 @@ private:
     std::string fTrackModuleLabel;
     std::string fOpFlashModuleLabel;
     std::string fShowerModuleLabel;
+    std::string fPointIDModuleLabel;
     double 	fPIDA_endPoint;
     bool	fSaveMCTree; 
  
@@ -111,6 +112,8 @@ private:
 
     int    n_vertices;
     double vertex[MAX_TRACKS][4];
+    int    n_decayVtx;
+    double decayVtx[MAX_TRACKS][3];
     int    n_recoTracks;
     int    track_npoints[MAX_TRACKS];
     int    track_isContained[MAX_TRACKS];
@@ -193,6 +196,7 @@ void NDKAna::reconfigure(fhicl::ParameterSet const& p){
     fTrackModuleLabel    = p.get<std::string>("TrackModuleLabel");
     fOpFlashModuleLabel  = p.get<std::string>("OpFlashModuleLabel");
     fShowerModuleLabel	 = p.get<std::string>("ShowerModuleLabel");
+    fPointIDModuleLabel  = p.get<std::string>("PointIDModuleLabel");
     fPIDA_endPoint	 = p.get<double>("PIDA_endPoint");
     fFidVolCutX          = p.get<double>("FidVolCutX");
     fFidVolCutY          = p.get<double>("FidVolCutY");
@@ -264,6 +268,8 @@ void NDKAna::beginJob(){
   fEventTree->Branch("n_vertices", &n_vertices);
   fEventTree->Branch("vertex", &vertex,"vertex[n_vertices][4]/D");
   fEventTree->Branch("n_reco_tracks", &n_recoTracks);
+  fEventTree->Branch("n_decayVtx", &n_decayVtx);
+  fEventTree->Branch("decayVtx", &decayVtx,"decayVtx[n_decayVtx][3]/D");
   fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
   fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
   fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
@@ -469,6 +475,22 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_PID_pdg[i] = trk_pid[best_plane]->Pdg();
     }
 
+    //CNN dacayID vertex 
+    art::Handle<std::vector<recob::Vertex>> dcy_vtxHandle;
+    if(!event.getByLabel(fPointIDModuleLabel,dcy_vtxHandle)) return;
+    std::vector<art::Ptr<recob::Vertex>> dcy_vtxlist;
+    art::fill_ptr_vector(dcy_vtxlist, dcy_vtxHandle); 
+    n_decayVtx= dcy_vtxlist.size();
+   
+    //art::FindManyP<recob::Track> decay_tracklist(dcy_vtxHandle, event, fPointIDModuleLabel);
+    for( int i=0; i< n_decayVtx; ++i){
+       double tmp_vtx[3] ={-999.0,-999.0,-999.0};
+       dcy_vtxlist[i]->XYZ(tmp_vtx);
+       for( int j=0; j<3; ++j) decayVtx[i][j]=tmp_vtx[j]; 
+       //std::vector<art::Ptr<recob::Track>>  decay_track = decay_tracklist.at(i);
+       //cout<<"how many tracks? "<<decay_track.size()<<endl;
+    } 
+ 
     //Showers... for background rejection
     art::Handle<std::vector<recob::Shower>> showerHandle;
     if(!event.getByLabel(fShowerModuleLabel,showerHandle)) return;
@@ -687,6 +709,7 @@ void NDKAna::reset(){
    MC_npart =0; 
    n_recoTracks =0;
    n_vertices = 0;
+   n_decayVtx =0;
    for(int i = 0; i<4; ++i){
       MC_vertex[i] = -999.0;
    }
