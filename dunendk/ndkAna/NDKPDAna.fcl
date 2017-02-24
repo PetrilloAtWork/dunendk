@@ -1,0 +1,48 @@
+#include "services_dune.fcl"
+
+process_name: NDKPDAna 
+
+services:
+{
+  TFileService: { fileName: "test.root" }
+  TimeTracker:       {}
+  RandomNumberGenerator: {} 
+  message: @local::standard_info
+  FileCatalogMetadata:  @local::art_file_catalog_mc
+                        @table::dunefd_simulation_services
+}
+services.Geometry: @local::dune10kt_1x2x6_geo
+
+source:
+{
+  module_type: RootInput
+  firstEvent : 1
+  maxEvents: 10
+}
+
+
+outputs:{}
+
+
+physics:
+{
+
+  analyzers:
+  {
+    NDKPDAna: 
+    {
+      module_type:      	"NDKPDAna"
+      MCTruthModuleLabel:	"generator"
+      ParticleModuleLabel:      "largeant"
+      OpFlashModuleLabel:	"opflash" 
+      OpHitModuleLabel:		"ophit"
+      FidVolCutX:		10.0
+      FidVolCutY:		10.0
+      FidVolCutZ:		10.0
+
+    }
+  }
+  analysis: [ NDKPDAna ] //Directory for histograms
+  end_paths: [ analysis ]
+}
+
