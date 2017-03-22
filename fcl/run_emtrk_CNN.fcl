@@ -1,15 +1,67 @@
+#include "services_dune.fcl"
+#include "caldata_dune.fcl"
 #include "imagepatternalgs.fcl"
-#include "standard_reco_dune10kt.fcl"
+#include "standard_reco_dune10kt_1x2x6.fcl"
 
-# Example minimal configuration to run EM/track separation in front of 3D track reconstruction
-# The module produces tracks where seed (cluster from which track is initiated) has to be
-# track-like. Since it is still possible that electron track was reconstructed, the resulting
-# 3D track is checked in its best projection and if CNN output there, using all hits, is below
-# track-like threshold, the corresponding PFParticle is tagged with PDG code 11 (electron).
+process_name: CNNreco
 
-process_name: Reco
+services:
+{
+  TFileService: { fileName: "NDK_reco_CNN.root" }
+  TimeTracker:       {}
+  message: @local::standard_info
+  FileCatalogMetadata:  @local::art_file_catalog_mc
+                        @table::dunefd_simulation_services
+}
+services.Geometry: @local::dune10kt_1x2x6_geo
 
-source.inputCommands: ["keep *_*_*_*", "drop *_*_*_Reco" ]
+
+
+source:
+{
+  module_type: RootInput
+  maxEvents:  -1        # Number of events to create
+}
+
+physics:
+{
+ producers:
+ {
+  # detect decay vertices along reconstructed 3D tracks
+  # produces recob::Vertex objects associated to input tracks
+  decayid:         @local::standard_particledecayid
+  # The module produces tracks where seed (cluster from which track is initiated) has to be
+  # track-like. Since it is still possible that electron track was reconstructed, the resulting
+  # 3D track is checked in its best projection and if CNN output there, using all hits, is below
+  # track-like threshold, the corresponding PFParticle is tagged with PDG code 11 (electron).
+  emtrkmichelid:   @local::standard_emtrackmichelid
+  pmtrackCNN:      @local::dunefd_pmalgtrackmaker
+ }
+ analyzers:
+ {
+
+ }
+ reco: [ emtrkmichelid, pmtrackCNN, decayid  ] 
+ stream1:  [ out1 ]
+
+ trigger_paths: [ reco ]
+ end_paths:     [ stream1 ]
+}
+
+outputs:
+{
+ out1:
+ {
+   module_type: RootOutput
+   fileName:    "/dune/data/users/higuera/CNN_reco/CNN_reco.root"
+   dataTier:    "full-reconstructed"
+   compressionLevel: 1
+ }
+}
+
+# decay detection configuration:
+# PatchSizeW and PatchSizeD together with DriftWindow have to be corresponding
+# to the CNN model parameters (here the patch is 16cm2, assuming ProtoDUNE's
 
 physics.producers.emtrkmichelid:                            @local::standard_emtrackmichelid
 physics.producers.emtrkmichelid.PointIdAlg.NNetModelFile:   "/dune/data/users/higuera/CNN_models/cnn_ndkemtrk_pitch_5_wire_44_drift_48_down_6_mean_notes_AtmAndNdkV2.nnet"
@@ -21,17 +73,23 @@ physics.producers.emtrkmichelid.HitModuleLabel:             "linecluster"
 physics.producers.emtrkmichelid.ClusterModuleLabel:         "linecluster"
 physics.producers.emtrkmichelid.Views:                      []
 
-physics.producers.pmtrack.HitModuleLabel:                     "linecluster"
-#physics.producers.pmtrack.ClusterModuleLabel:                 "linecluster" # the ususal way, all clusters used to create 3D tracks
-physics.producers.pmtrack.ClusterModuleLabel:                 "emtrkmichelid:emtrkmichel" # 3D track seed has to be track-like over the threshold
-physics.producers.pmtrack.PMAlgTracking.TrackLikeThreshold:   0.7  # and this is the threshold to be track-like
-physics.producers.pmtrack.PMAlgTracking.RunVertexing:         true
-physics.producers.pmtrack.PMAlgTracking.FlipToBeam:           true
-physics.producers.pmtrack.PMAlgTracking.MatchT0inAPACrossing: false
-physics.producers.pmtrack.PMAlgTracking.MatchT0inCPACrossing: false
-#physics.producers.pmtrack.PMAlgTracking.AutoFlip_dQdx: true
+physics.producers.pmtrackCNN.HitModuleLabel:                     "linecluster"
+#physics.producers.pmtrackCNN.ClusterModuleLabel:                 "linecluster" # the ususal way, all clusters used to create 3D tracks
+physics.producers.pmtrackCNN.ClusterModuleLabel:                 "emtrkmichelid:emtrkmichel" # 3D track seed has to be track-like over the threshold
+physics.producers.pmtrackCNN.PMAlgTracking.TrackLikeThreshold:   0.7  # and this is the threshold to be track-like
+physics.producers.pmtrackCNN.PMAlgTracking.RunVertexing:         true
+physics.producers.pmtrackCNN.PMAlgTracking.FlipToBeam:           false
+physics.producers.pmtrackCNN.PMAlgTracking.MatchT0inAPACrossing: false
+physics.producers.pmtrackCNN.PMAlgTracking.MatchT0inCPACrossing: false
+physics.producers.pmtrackCNN.PMAlgTracking.AutoFlip_dQdx: true
 
-physics.reco: [ rns, caldata, gaushit, hitfd, linecluster, emtrkmichelid, pmtrack ]
-#physics.reco: [ rns, caldata, gaushit, hitfd, linecluster, pmtrack ] # usual reco chain
+# 5mm wire pitch, 2MHz sampling and drift speed at 500V/cm)
+physics.producers.decayid.PointIdAlg.NNetModelFile:      "/dune/data/users/higuera/CNN_models/cnn_decayid_pitch_5_wire_32_drift_44_down_6_mean_notes_CollAndIndStoppingMu.nnet"
+physics.producers.decayid.PointIdAlg.PatchSizeW:         32     # how many wires in patch
+physics.producers.decayid.PointIdAlg.PatchSizeD:         44     # how many downsampled ADC entries
+physics.producers.decayid.PointIdAlg.DriftWindow:        6      # downsampling window in drift ticks
+physics.producers.decayid.PointIdAlg.DownscaleFn:        "mean" # downsampling function
+physics.producers.decayid.TrackModuleLabel:              "pmtrackCNN" # tracks to be processed
+physics.producers.decayid.PointThreshold:                0.998  # threshold on p(decay) used to select decay candidates
 
 
