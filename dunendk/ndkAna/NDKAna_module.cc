@@ -12,21 +12,25 @@
 #include "lardata/Utilities/GeometryUtilities.h"
 #include "larsim/Simulation/LArG4Parameters.h"
 #include "lardataobj/RecoBase/Track.h"
+#include "lardataobj/RecoBase/Vertex.h"
 #include "lardataobj/RecoBase/Cluster.h"  
+#include "lardataobj/RecoBase/Wire.h"
+#include "lardataobj/RecoBase/Hit.h"
+#include "lardataobj/RecoBase/OpFlash.h"
+#include "lardataobj/RecoBase/Shower.h"
+#include "lardataobj/RecoBase/OpHit.h"
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
 #include "larsim/MCCheater/BackTracker.h"
+#include "larsim/MCCheater/PhotonBackTracker.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardata/DetectorInfoServices/DetectorClocksService.h"
-#include "lardataobj/RecoBase/Vertex.h"
 #include "lardataobj/AnalysisBase/Calorimetry.h"
 #include "lardataobj/AnalysisBase/ParticleID.h"
 #include "lardata/Utilities/AssociationUtil.h"
 #include "larreco/RecoAlg/TrackMomentumCalculator.h"
-#include "lardataobj/RecoBase/OpFlash.h"
-#include "lardataobj/RecoBase/Shower.h"
 #include "lardataobj/AnalysisBase/T0.h"
-#include "lardataobj/RecoBase/OpHit.h"
-
+#include "lardata/ArtDataHelper/MVAReader.h"
+#include "larreco/Calorimetry/CalorimetryAlg.h"
 // Framework includes
 #include "art/Framework/Core/EDAnalyzer.h"
 #include "art/Framework/Principal/Event.h"
@@ -46,11 +50,10 @@
 #include "TTree.h"
 #include "TDirectory.h"
 
-#define MAX_TRACKS 200
-#define MAX_POINTS 3000
-#define MAX_FLASHES 2000
-#define MAX_SHOWERS 100
-
+#define MAX_TRACKS 20000
+#define MAX_FLASHES 20000
+#define MAX_SHOWERS 1000
+#define MVA_LENGTH 4
 using namespace std;
 
 //========================================================================
@@ -81,11 +84,11 @@ public:
 private:
 
     // the parameters we'll read from the .fcl
-    std::string fMCTruthModuleLabel;
     std::string fTrackModuleLabel;
     std::string fOpFlashModuleLabel;
     std::string fShowerModuleLabel;
     std::string fPointIDModuleLabel;
+    std::string fNNetModuleLabel;
     double 	fPIDA_endPoint;
     bool	fSaveMCTree; 
  
@@ -131,8 +134,8 @@ private:
     int    track_mcID[MAX_TRACKS];
     int    track_mcPDG[MAX_TRACKS];
     double track_dQdx[MAX_TRACKS][1000];
-    //std::vector<std::vector<double> > track_dQdx;
 
+    double Em_ch;
 
     int    n_recoShowers;
     double sh_direction_X[MAX_SHOWERS];
@@ -158,7 +161,9 @@ private:
     double flash_timewidth[MAX_FLASHES];
     double flash_abstime[MAX_FLASHES];
     int    flash_frame[MAX_FLASHES];
-
+    double flash_PE_ndk[MAX_FLASHES];
+    double flash_PE_Ar39[MAX_FLASHES];
+ 
     double fFidVolCutX;
     double fFidVolCutY;
     double fFidVolCutZ;
@@ -170,18 +175,23 @@ private:
     double fFidVolZmin;
     double fFidVolZmax;
 
+    double fPidValue;
+    unsigned int    fView;
+
+
     detinfo::DetectorProperties const *detprop = lar::providerFrom<detinfo::DetectorPropertiesService>();
     detinfo::DetectorClocks const *ts = lar::providerFrom<detinfo::DetectorClocksService>();
     double XDriftVelocity = detprop->DriftVelocity()*1e-3; //cm/ns
     double WindowSize     = detprop->NumberTimeSamples() * ts->TPCClock().TickPeriod() * 1e3;
     art::ServiceHandle<geo::Geometry> geom;
-
+    calo::CalorimetryAlg fCalorimetryAlg;
  }; // class NDKAna
 
 
 //========================================================================
 NDKAna::NDKAna(fhicl::ParameterSet const& parameterSet)
     : EDAnalyzer(parameterSet)
+    , fCalorimetryAlg(parameterSet.get<fhicl::ParameterSet>("CalorimetryAlg"))
 {
     reconfigure(parameterSet);
 }
@@ -192,11 +202,13 @@ NDKAna::~NDKAna(){
 //========================================================================
 void NDKAna::reconfigure(fhicl::ParameterSet const& p){
 
-    fMCTruthModuleLabel  = p.get<std::string>("MCTruthModuleLabel");
     fTrackModuleLabel    = p.get<std::string>("TrackModuleLabel");
     fOpFlashModuleLabel  = p.get<std::string>("OpFlashModuleLabel");
     fShowerModuleLabel	 = p.get<std::string>("ShowerModuleLabel");
     fPointIDModuleLabel  = p.get<std::string>("PointIDModuleLabel");
+    fNNetModuleLabel     = p.get<std::string>("NNetModuleLabel");
+    fPidValue 	 	 = p.get<double>("PidValue");
+    fView                = p.get<double>("View");
     fPIDA_endPoint	 = p.get<double>("PIDA_endPoint");
     fFidVolCutX          = p.get<double>("FidVolCutX");
     fFidVolCutY          = p.get<double>("FidVolCutY");
@@ -273,7 +285,6 @@ void NDKAna::beginJob(){
   fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
   fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
   fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
-  //fEventTree->Branch("track_dQdx", &track_dQdx);
   fEventTree->Branch("track_dQdx", &track_dQdx,"track_dQdx[n_reco_tracks][1000]/D");
   fEventTree->Branch("track_npoints", &track_npoints,"track_npoints[n_reco_tracks]/I");
   fEventTree->Branch("track_length", &track_length,"track_length[n_reco_tracks]/D");
@@ -286,6 +297,8 @@ void NDKAna::beginJob(){
   fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");
   fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");
   fEventTree->Branch("track_mcPDG", &track_mcPDG,"track_mcPDG[n_reco_tracks]/I");
+
+  fEventTree->Branch("Em_ch", &Em_ch);
 
   fEventTree->Branch("n_showers", &n_recoShowers);
   fEventTree->Branch("sh_direction_X", &sh_direction_X, "sh_direction_X[n_showers]/D");
@@ -312,7 +325,10 @@ void NDKAna::beginJob(){
   fEventTree->Branch("flash_abstime", &flash_abstime, "flash_abstime[n_flashes]/D");
   fEventTree->Branch("flash_frame", &flash_frame, "flash_frame[n_flashes]/I");
 
-  
+  fEventTree->Branch("flash_PE_ndk", &flash_PE_ndk, "flash_PE_ndk[n_flashes]/D");
+  fEventTree->Branch("flash_PE_Ar39", &flash_PE_Ar39, "flash_PE_Ar39[n_flashes]/D");
+
+ 
 
 }
 //========================================================================
@@ -354,6 +370,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        const TLorentzVector& momentumStart = particle->Momentum(0);
        const TLorentzVector& momentumEnd   = particle->EndMomentum();
        //!Save the true vertex as the vertex using primaries ...hmmm do you have another suggestion?
+       //if( particle->Mother() == 0 && particle->PdgCode() == 321) positionStart.GetXYZT(MC_vertex); //use kaon as true vertex 
        if( particle->Mother() == 0 ) positionStart.GetXYZT(MC_vertex); 
        positionStart.GetXYZT(MC_startXYZT[i]);
        positionEnd.GetXYZT(MC_endXYZT[i]);
@@ -383,10 +400,11 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     
     art::Handle< std::vector<recob::Vertex> > vtxListHandle;
     std::vector<art::Ptr<recob::Vertex>> vtxlist;
-    if(!event.getByLabel(fTrackModuleLabel, vtxListHandle)) return; 
-    art::fill_ptr_vector(vtxlist, vtxListHandle);
-    n_vertices = vtxlist.size();
+    if(event.getByLabel(fTrackModuleLabel, vtxListHandle)) 
+      art::fill_ptr_vector(vtxlist, vtxListHandle);
 
+    n_vertices = vtxlist.size();
+    if( n_vertices != 0 )
     for( int i =0; i<n_vertices; ++i){
        double tmp_vtx[3] ={-999.0,-999.0,-999.0};
        vtxlist[i]->XYZ(tmp_vtx);
@@ -401,11 +419,13 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     std::string PID_ModuleLabel = fTrackModuleLabel;
     PID_ModuleLabel +="pid";
     art::FindMany<anab::ParticleID> reco_PID(trackListHandle, event, PID_ModuleLabel); 
+
     std::vector<art::Ptr<recob::Hit>> tmp_all_trackHits = track_hits.at(0);  
     std::vector<art::Ptr<recob::Hit>> all_hits;
     art::Handle<std::vector<recob::Hit>> hithandle;
     if(event.get(tmp_all_trackHits[0].id(), hithandle))  art::fill_ptr_vector(all_hits, hithandle);
 
+    //cout<<"trks "<<n_recoTracks<<endl;
     for(int i=0; i<n_recoTracks; ++i) {
        art::Ptr<recob::Track> track = tracklist[i];
        track_length[i] = track->Length();
@@ -441,6 +461,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        else track_isContained[i] =0;
        std::vector<art::Ptr<recob::Hit>> all_trackHits = track_hits.at(i);  
        //call dEdx
+       
        std::vector<const anab::Calorimetry*> trk_cal = reco_cal.at(i);
        double PID_dEdx, range, res_range;// PIDA;
        double PIDA =-999.0;
@@ -448,6 +469,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        cal(trk_cal, PID_dEdx, range, res_range, PIDA, KE ); 
        track_PIDA[i] = PIDA;
        track_KE[i] = KE;
+      
        double tmpEfrac = 0;
        const simb::MCParticle *particle;
        double tmpComplet = 0;
@@ -457,6 +479,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_mcPDG[i] = particle->PdgCode();
        track_Efrac[i] = tmpEfrac; 
        track_complet[i] = tmpComplet;
+    
        //Chi2 PID 
        std::vector<const anab::ParticleID*> trk_pid = reco_PID.at(i);
        int best_plane;
@@ -473,16 +496,20 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
          best_plane = 2;
        }
        track_PID_pdg[i] = trk_pid[best_plane]->Pdg();
+       //cout<<track_PIDA[i]<<" chi2 pid "<<track_PID_pdg[i]<<endl;
+       
     }
 
     //CNN dacayID vertex 
     art::Handle<std::vector<recob::Vertex>> dcy_vtxHandle;
-    if(!event.getByLabel(fPointIDModuleLabel,dcy_vtxHandle)) return;
     std::vector<art::Ptr<recob::Vertex>> dcy_vtxlist;
-    art::fill_ptr_vector(dcy_vtxlist, dcy_vtxHandle); 
+    if(event.getByLabel(fPointIDModuleLabel,dcy_vtxHandle)) 
+      art::fill_ptr_vector(dcy_vtxlist, dcy_vtxHandle); 
+
     n_decayVtx= dcy_vtxlist.size();
    
     //art::FindManyP<recob::Track> decay_tracklist(dcy_vtxHandle, event, fPointIDModuleLabel);
+    if( n_decayVtx !=0 )
     for( int i=0; i< n_decayVtx; ++i){
        double tmp_vtx[3] ={-999.0,-999.0,-999.0};
        dcy_vtxlist[i]->XYZ(tmp_vtx);
@@ -490,13 +517,45 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        //std::vector<art::Ptr<recob::Track>>  decay_track = decay_tracklist.at(i);
        //cout<<"how many tracks? "<<decay_track.size()<<endl;
     } 
- 
+
+    //CNN Em-trk hits
+    //Imported code from PointIdEffTest_module.cc 
+    //to included hit and CNN output info into the analysis module
+    //to quantify how much EM activity we have in order to reduce background 
+    anab::MVAReader<recob::Hit, MVA_LENGTH> hitResults(event, fNNetModuleLabel);                     // hit-by-hit outpus just to be dumped to file for debugging
+    auto cluResults = anab::MVAReader<recob::Cluster, MVA_LENGTH>::create(event, fNNetModuleLabel);  // outputs for clusters recovered in not-throwing way 
+    Em_ch =0.0;
+    if(cluResults){
+      const art::FindManyP<recob::Hit> hitsFromClusters(cluResults->dataHandle(), event, cluResults->dataTag());
+      for(size_t c = 0; c < cluResults->size(); ++c){
+	 const recob::Cluster & clu = cluResults->item(c);
+         if(clu.Plane().Plane != fView) continue;
+    	 const std::vector< art::Ptr<recob::Hit> > & hits = hitsFromClusters.at(c);
+    	 std::array<float, MVA_LENGTH> cnn_out = cluResults->getOutput(c);
+         std::vector< anab::FeatureVector<MVA_LENGTH> >  hit_outs = hitResults.outputs();
+         double PidValue = 0;
+         double p_trk_or_sh = cnn_out[0] + cnn_out[1];
+	 if (p_trk_or_sh > 0) { PidValue = cnn_out[0] / p_trk_or_sh; }
+         for(auto const & h : hits){
+            //auto const & vout = hit_outs[h.key()];
+	    //double hitPidValue 0.0;
+            //double h_trk_or_sh = vout[0] + vout[1];
+            //if(h_trk_or_sh > 0) hitPidValue = vout[0] / h_trk_or_sh;
+              //cout<<h->WireID().TPC<<" "<<h->WireID().Wire<<" "<<PidValue<<" "<<hitPidValue<<endl;
+	      //cout<<h->SummedADC() * fCalorimetryAlg.LifetimeCorrection(h->PeakTime())<<endl;
+              if( PidValue < fPidValue ) Em_ch += h->SummedADC() * fCalorimetryAlg.LifetimeCorrection(h->PeakTime());
+	  }
+
+
+       }
+    } 
     //Showers... for background rejection
     art::Handle<std::vector<recob::Shower>> showerHandle;
-    if(!event.getByLabel(fShowerModuleLabel,showerHandle)) return;
     std::vector<art::Ptr<recob::Shower>> showerlist;
-    art::fill_ptr_vector(showerlist, showerHandle); 
+    if(event.getByLabel(fShowerModuleLabel,showerHandle)) 
+      art::fill_ptr_vector(showerlist, showerHandle); 
     n_recoShowers= showerlist.size();
+    if( n_recoShowers != 0 )
     for(int i=0; i<n_recoShowers && i< MAX_SHOWERS; ++i){
        art::Ptr<recob::Shower> shower = showerlist[i];
        sh_direction_X[i] = shower->Direction().X();  
@@ -511,27 +570,58 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        for( size_t j =0; j<shower->MIPEnergy().size(); j++) sh_MIPenergy[i][j] = shower->MIPEnergy()[j];
        for( size_t j =0; j<shower->dEdx().size(); j++) sh_dEdx[i][j] = shower->dEdx()[j];
     }
- 
     //PDS info... this may be useful for background rejection
 
+    art::ServiceHandle<cheat::PhotonBackTracker> Photon_bt;
     art::Handle< std::vector<recob::OpFlash> > flashListHandle;
     std::vector<art::Ptr<recob::OpFlash> > flashlist;
-    if(!event.getByLabel(fOpFlashModuleLabel,flashListHandle)) return;
-    art::fill_ptr_vector(flashlist, flashListHandle); 
-    
+    if(event.getByLabel(fOpFlashModuleLabel,flashListHandle))
+      art::fill_ptr_vector(flashlist, flashListHandle); 
+    //cout<<"flashes "<<flashlist.size()<<endl; 
     n_flashes = flashlist.size();
-    for(int i=0; i<n_flashes && i <MAX_FLASHES; ++i ){
-       flash_time[i] = flashlist[i]->Time();
-       flash_pe[i] = flashlist[i]->TotalPE();
-       flash_ycenter[i] = flashlist[i]->YCenter();
-       flash_zcenter[i] = flashlist[i]->ZCenter();
-       flash_ywidth[i] = flashlist[i]->YWidth();
-       flash_zwidth[i] = flashlist[i]->ZWidth();
-       flash_timewidth[i] = flashlist[i]->TimeWidth();
-       flash_abstime[i] = flashlist[i]->AbsTime();
-       flash_frame[i] = flashlist[i]->Frame();
-    }
+    if( n_flashes != 0 ){
+      art::FindManyP<recob::OpHit> flash_ophits(flashListHandle, event, fOpFlashModuleLabel);
+
+      for(int i=0; i<n_flashes && i <MAX_FLASHES; ++i ){
+         flash_time[i] = flashlist[i]->Time();
+         flash_pe[i] = flashlist[i]->TotalPE();
+         flash_ycenter[i] = flashlist[i]->YCenter();
+         flash_zcenter[i] = flashlist[i]->ZCenter();
+         flash_ywidth[i] = flashlist[i]->YWidth();
+         flash_zwidth[i] = flashlist[i]->ZWidth();
+         flash_timewidth[i] = flashlist[i]->TimeWidth();
+         flash_abstime[i] = flashlist[i]->AbsTime();
+         flash_frame[i] = flashlist[i]->Frame();
+
+         std::vector<art::Ptr<recob::OpHit>> thisflash_Hits = flash_ophits.at(i);
+
+         double Pe_Ar39 =0.0;
+         double Pe_ndk =0.0;
+         for( size_t j =0; j<thisflash_Hits.size(); ++j){
+            std::vector<sim::TrackSDP> trkSDPs = Photon_bt->OpHitToEveSDPs(thisflash_Hits[j]);
+            if( trkSDPs.size() != 0 ){ 
+              for(const sim::TrackSDP trkSDP : trkSDPs){
+                 if( trkSDP.trackID != 0){//Why ??
+                   double E_frac = trkSDP.energyFrac;  //fraction of OpHit energy from the particle with this trackID
+                   const simb::MCParticle* particle = Photon_bt->TrackIDToParticle(trkSDP.trackID); 
+                   //cout<<"e frac "<<E_frac<<" "<<particle->PdgCode()<<" "<<thisflash_Hits[j]->PE()<<endl;
+                   if( particle->PdgCode() == 11 &&  particle->Mother() == 0 ){ 
+                     Pe_Ar39 += thisflash_Hits[j]->PE()*E_frac;
+                   }
+                   else{
+                     Pe_ndk +=  thisflash_Hits[j]->PE()*E_frac; 
+                   }
+                 }
+              }
+            }
+         }
        
+         flash_PE_ndk[i]= Pe_ndk;
+         flash_PE_Ar39[i]= Pe_Ar39;
+      }
+    }
+      
+    //cout<<"pass all "<<isFiducial<<endl; 
 }
 //========================================================================
 void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac, double &Ecomplet){
@@ -768,6 +858,10 @@ void NDKAna::reset(){
        flash_timewidth[i] = -999.0;
        flash_abstime[i] =-999.0;
        flash_frame[i] =-999;
+       flash_PE_ndk[i] = -999;  
+       flash_PE_Ar39[i] = -999;  
+
+
     }
     
 }

@@ -1,3 +1,4 @@
+#include "calorimetry_dune10kt.fcl"
 #include "services_dune.fcl"
 
 process_name: NDKAna 
@@ -32,11 +33,13 @@ physics:
     NDKAna: 
     {
       module_type:      	"NDKAna"
-      MCTruthModuleLabel:	"generator"
-      ParticleModuleLabel:      "largeant"
       TrackModuleLabel: 	"pmtrack"
       OpFlashModuleLabel:	"opflash" 
       ShowerModuleLabel:        "emshower"
+      NNetModuleLabel:          "emtrkmichelid:emtrkmichel:CNNreco"
+      PidValue:		        0.7
+      CalorimetryAlg:           @local::dune10kt_calorimetryalgmc
+      View:			2
       PointIDModuleLabel:       "decayid"
       PIDA_endPoint:		25.0
       FidVolCutX:		10.0
