@@ -32,21 +32,18 @@ table_fragment_end
 # Add the dependent product and version
 
 product          version
-larsoft         v06_28_00
-duneutil        v06_28_00	-	optional
-dune_pardata	v01_14_00
-cetbuildtools	v5_06_07	-	only_for_build
 dunetpc	        v06_28_00
+cetbuildtools   v5_06_07        -       only_for_build
 end_product_list
 
 
 # We now define allowed qualifiers and the corresponding qualifiers for the depdencies.
 # Make a table by adding columns before "notes". 
 # e9  - with gcc 4.9.3 and -std=c++14
-qualifier	larsoft		duneutil	dune_pardata	dunetpc		notes
-e10:debug	e10:debug	e10:debug	-nq-		e10:debug
-e10:opt		e10:opt		e10:opt		-nq-		e10:opt
-e10:prof	e10:prof	e10:prof	-nq-		e10:prof
+qualifier	dunetpc		notes
+e10:debug	e10:debug
+e10:opt		e10:opt
+e10:prof	e10:prof
 end_qualifier_list
 
 # Preserve tabs and formatting in emacs and vi / vim:
