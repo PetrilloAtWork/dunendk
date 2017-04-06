@@ -11,7 +11,7 @@ ndksens originates from pybbsens, a similar set of scripts for neutrinoless doub
 For more details about the statistical treatment used in ndksens and pybbsens, please refer to:
 J.J. Gomez-Cadenas, J. Martin-Albo, M. Sorel et al., "Sense and sensitivity of double beta decay experiments," JCAP 1106 (2011) 007, http://arxiv.org/abs/1010.5112
 
-The decay mode numbering scheme adopted matches the one of the Particle Data Group, see: http://pdg.lbl.gov/2015/listings/rpp2015-list-p.pdf
+The decay mode numbering scheme adopted matches the one of the Particle Data Group, see: http://pdg.lbl.gov/2016/listings/rpp2016-list-p.pdf
 
 The pre-defined efficiency/background assumptions for an argon-based detector are taken from: 
 A. Bueno et al., "Nucleon decay searches with large liquid argon TPC detectors at shallow depths: atmospheric and cosmogenic backgrounds," JHEP 0704 (2007) 041, http://arxiv.org/abs/hep-ph/0701101
@@ -27,7 +27,13 @@ ROOT built with python support, NumPy, SciPy
 
 ### Setup
 
-PYTHONPATH needs to include the path to the python and SciPy installations. It also needs to include $ROOTSYS/lib. PATH needs to include the path to the NumPy installation. 
+On a FNAL machine, UPS setup of the dunetpc, numpy and scipy packages needs to be done, for example:
+setup dunetpc v06_23_00 -q e10:prof
+setup numpy v1_11_2 -q e10:p2711:prof
+setup scipy v0_18_1 -q e10:p2711:prof
+Please check with "ups list -aK+" for available versions and qualifiers for dunetpc, numpy, scipy
+
+On a non-FNAL machine, PYTHONPATH needs to include the path to the python, SciPy, NumPy installations. It also needs to include $ROOTSYS/lib. 
 
 ### Example usage
 
