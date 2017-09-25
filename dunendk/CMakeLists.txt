@@ -1,6 +1,6 @@
 #add_subdirectory(NewSubdirectory)
 add_subdirectory(ndkAna)
-add_subdirectory(ndkReco)
+#add_subdirectory(ndkReco)
 
 
 # Respect the order specified in lar_build, which is:
