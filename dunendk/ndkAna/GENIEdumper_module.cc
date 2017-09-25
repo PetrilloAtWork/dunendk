@@ -12,7 +12,7 @@
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "nusimdata/SimulationBase/MCNeutrino.h"
 #include "nutools/EventGeneratorBase/evgenbase.h"
-#include "larcore/Geometry/Geometry.h"
+//#include "larcore/Geometry/Geometry.h"
 #include "larcoreobj/SummaryData/RunData.h"
 // Framework includes
 #include "art/Framework/Core/EDAnalyzer.h"
@@ -24,6 +24,7 @@
 #include "canvas/Persistency/Common/FindMany.h"
 #include "canvas/Persistency/Common/PtrVector.h"
 #include "canvas/Persistency/Common/Ptr.h"
+#include "canvas/Utilities/InputTag.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 #include "fhiclcpp/ParameterSet.h"
 

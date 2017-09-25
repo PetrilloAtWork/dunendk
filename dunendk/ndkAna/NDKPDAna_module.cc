@@ -36,6 +36,7 @@
 #include "canvas/Persistency/Common/FindMany.h"
 #include "canvas/Persistency/Common/PtrVector.h"
 #include "canvas/Persistency/Common/Ptr.h"
+#include "canvas/Utilities/InputTag.h"
 #include "messagefacility/MessageLogger/MessageLogger.h"
 #include "fhiclcpp/ParameterSet.h"
 
@@ -366,7 +367,7 @@ void NDKPDAna::Process( const art::Event& event, bool &isFiducial){
     //cout<<"fiducial "<<isFiducial<<endl;
     //if( !isFiducial ) return;
     isFiducial = true;
-     
+    /* 
     //========================================================================
     //========================================================================
     // Reco  stuff
@@ -409,7 +410,7 @@ void NDKPDAna::Process( const art::Event& event, bool &isFiducial){
             }
          }
        }
-       /*
+       / *
        else wotrkID ++; 
        ophit_pdg[i] = tmp_pdg; //temporally 
        //cout<<"peak time "<<op_hit->PeakTime()<<" PE "<<op_hit->PE()<<" CH "<<op_hit->OpChannel()<<" Frame "<<op_hit->Frame()<<endl;
@@ -420,7 +421,7 @@ void NDKPDAna::Process( const art::Event& event, bool &isFiducial){
          ophit_XYZ[i][1]=tmp_xyz.at(1);
          ophit_XYZ[i][2]=tmp_xyz.at(2);
        }
-        */
+        * /
     }
     cout<<"How many reco optical hits: "<<n_ophits<<endl;
     //cout<<"these many optical hits have a track ID associated: "<<wtrkID<<endl;
@@ -505,7 +506,7 @@ void NDKPDAna::Process( const art::Event& event, bool &isFiducial){
        flash_abstime[i] = flashlist[i]->AbsTime();
        flash_frame[i] = flashlist[i]->Frame();
     }
-    /*
+    / *
     std::vector<art::Ptr<recob::OpHit>> flash1_Hits;  //one flash
     std::vector<art::Ptr<recob::OpHit>> flash2_Hits;  //two flash
     if( n_flashes == 1 ){
@@ -524,9 +525,9 @@ void NDKPDAna::Process( const art::Event& event, bool &isFiducial){
        }
 
     }
+    * /
     */
-
-}
+} 
 //========================================================================
 bool NDKPDAna::insideFV( double vertex[4]){ 
 
