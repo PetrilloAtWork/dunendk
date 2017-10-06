@@ -182,14 +182,14 @@ private:
     double XDriftVelocity = detprop->DriftVelocity()*1e-3; //cm/ns
     double WindowSize     = detprop->NumberTimeSamples() * ts->TPCClock().TickPeriod() * 1e3;
     art::ServiceHandle<geo::Geometry> geom;
-    //calo::CalorimetryAlg fCalorimetryAlg;
+    calo::CalorimetryAlg fCalorimetryAlg;
  }; // class NDKAna
 
 
 //========================================================================
 NDKAna::NDKAna(fhicl::ParameterSet const& parameterSet)
     : EDAnalyzer(parameterSet)
-    /*, fCalorimetryAlg(parameterSet.get<fhicl::ParameterSet>("CalorimetryAlg") )*/
+    , fCalorimetryAlg(parameterSet.get<fhicl::ParameterSet>("CalorimetryAlg") )
 {
     reconfigure(parameterSet);
 }
@@ -496,7 +496,6 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        //cout<<"how many tracks? "<<decay_track.size()<<endl;
     } 
 
-    /*
     //CNN Em-trk hits
     //Imported code from PointIdEffTest_module.cc 
     //to included hit and CNN output info into the analysis module
@@ -516,16 +515,8 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
          double p_trk_or_sh = cnn_out[0] + cnn_out[1];
 	 if (p_trk_or_sh > 0) { PidValue = cnn_out[0] / p_trk_or_sh; }
          for(auto const & h : hits){
-            //auto const & vout = hit_outs[h.key()];
-	    //double hitPidValue 0.0;
-            //double h_trk_or_sh = vout[0] + vout[1];
-            //if(h_trk_or_sh > 0) hitPidValue = vout[0] / h_trk_or_sh;
-              //cout<<h->WireID().TPC<<" "<<h->WireID().Wire<<" "<<PidValue<<" "<<hitPidValue<<endl;
-	      //cout<<h->SummedADC() * fCalorimetryAlg.LifetimeCorrection(h->PeakTime())<<endl;
-              if( PidValue < fPidValue ) Em_ch += h->SummedADC() * fCalorimetryAlg.LifetimeCorrection(h->PeakTime());
+            if( PidValue < fPidValue ) Em_ch += h->SummedADC() * fCalorimetryAlg.LifetimeCorrection( h->PeakTime() );
 	  }
-
-
        }
     } 
     //Showers... for background rejection
@@ -549,6 +540,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        for( size_t j =0; j<shower->MIPEnergy().size(); j++) sh_MIPenergy[i][j] = shower->MIPEnergy()[j];
        for( size_t j =0; j<shower->dEdx().size(); j++) sh_dEdx[i][j] = shower->dEdx()[j];
     }
+    /*
     //PDS info... this may be useful for background rejection
 
     art::ServiceHandle<cheat::PhotonBackTracker> Photon_bt;
