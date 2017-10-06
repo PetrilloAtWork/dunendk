@@ -1,0 +1,81 @@
+#include "services_dune.fcl"
+#include "caldata_dune.fcl"
+#include "imagepatternalgs.fcl"
+#include "standard_reco_dune10kt_1x2x6.fcl"
+
+process_name: CNNreco
+
+services:
+{
+  TFileService: { fileName: "reco_hist.root" }
+  TimeTracker:       {}
+  message: @local::standard_info
+  FileCatalogMetadata:  @local::art_file_catalog_mc
+                        @table::dunefd_simulation_services
+                        @table::dunefd_reco_services
+}
+services.Geometry: @local::dune10kt_1x2x6_geo
+
+
+
+source:
+{
+  module_type: RootInput
+  maxEvents:  -1        # Number of events to create
+}
+
+physics:
+{
+ producers:
+ {
+  # detect decay vertices along reconstructed 3D tracks
+  # produces recob::Vertex objects associated to input tracks
+  # The module produces tracks where seed (cluster from which track is initiated) has to be
+  # track-like. Since it is still possible that electron track was reconstructed, the resulting
+  # 3D track is checked in its best projection and if CNN output there, using all hits, is below
+  # track-like threshold, the corresponding PFParticle is tagged with PDG code 11 (electron).
+
+  pmtrackCNN:      @local::dunefd_pmalgtrackmaker
+  pmtrackCNNcalo:         @local::dune10kt_calomc
+  pmtrackCNNpid:          @local::standard_chi2pid
+ 
+
+ }
+ analyzers:
+ {
+
+ }
+ reco: [ pmtrackCNN, pmtrackCNNcalo, pmtrackCNNpid  ] 
+ stream1:  [ out1 ]
+
+ trigger_paths: [ reco ]
+ end_paths:     [ stream1 ]
+}
+
+outputs:
+{
+ out1:
+ {
+   module_type: RootOutput
+   fileName:    "%ifb_CNN_reco.root"
+   dataTier:    "full-reconstructed"
+   compressionLevel: 1
+ }
+}
+
+physics.producers.pmtrackCNN.HitModuleLabel:                     "linecluster"
+physics.producers.pmtrackCNN.ClusterModuleLabel:                 "emtrkmichelid:emtrkmichel" # 3D track seed has to be track-like over the threshold
+physics.producers.pmtrackCNN.PMAlgTracking.TrackLikeThreshold:   0.7  # and this is the threshold to be track-like
+physics.producers.pmtrackCNN.PMAlgTracking.MinSeedSize2ndPass:  2
+physics.producers.pmtrackCNN.PMAlgTracking.RunVertexing:         false
+physics.producers.pmtrackCNN.PMAlgTracking.FlipToBeam:           false
+physics.producers.pmtrackCNN.PMAlgTracking.MatchT0inAPACrossing: false
+physics.producers.pmtrackCNN.PMAlgTracking.MatchT0inCPACrossing: false
+physics.producers.pmtrackCNN.PMAlgTracking.AutoFlip_dQdx: true
+
+physics.producers.pmtrackCNNcalo.TrackModuleLabel:         "pmtrackCNN"
+physics.producers.pmtrackCNNcalo.SpacePointModuleLabel:    "pmtrackCNN"
+physics.producers.pmtrackCNNcalo.T0ModuleLabel:            ""
+physics.producers.pmtrackCNNcalo.MakeTree:                 false
+physics.producers.pmtrackCNNpid.CalorimetryModuleLabel:  "pmtrackCNNcalo"
+physics.producers.pmtrackCNNpid.TrackModuleLabel:        "pmtrackCNN"
