@@ -1,8 +1,10 @@
 art_make( MODULE_LIBRARIES larcorealg_Geometry
+          lardata_ArtDataHelper
 	  larcore_Geometry_Geometry_service
 	  larsim_Simulation nutools_ParticleNavigation lardataobj_Simulation
 	  larsim_MCCheater_BackTracker_service
 	  lardata_Utilities
+          larreco_Calorimetry
 	  larevt_Filters
 	  lardataobj_RawData
 	  lardataobj_RecoBase

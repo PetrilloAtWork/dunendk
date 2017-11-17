@@ -5,7 +5,7 @@ process_name: NDKAna
 
 services:
 {
-  TFileService: { fileName: "test.root" }
+  TFileService: { fileName: "ndk_CNN.root" }
   TimeTracker:       {}
   RandomNumberGenerator: {} 
   message: @local::standard_info
@@ -33,11 +33,12 @@ physics:
     NDKAna: 
     {
       module_type:      	"NDKAna"
-      TrackModuleLabel: 	"pmtrack"
+      HitModuleLabel:	 	"gaushit"
+      TrackModuleLabel: 	"pmtrackCNN"
       OpFlashModuleLabel:	"opflash" 
       ShowerModuleLabel:        "emshower"
-      NNetModuleLabel:          "emtrkmichelid:emtrkmichel:CNNreco"
-      PidValue:		        0.7
+      NNetModuleLabel:          "emtrkmichelid:emtrkmichel:Reco"
+      PidValue:		        0.1
       CalorimetryAlg:           @local::dune10kt_calorimetryalgmc
       View:			2
       PointIDModuleLabel:       "decayid"
