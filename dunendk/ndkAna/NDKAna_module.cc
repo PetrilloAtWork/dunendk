@@ -74,7 +74,7 @@ public:
     void analyze(const art::Event& evt);
 
     void reconfigure(fhicl::ParameterSet const& pset);
-
+    void PIDAcal( std::vector<const anab::Calorimetry*> cal, std::vector<double> &PIDA, std::vector<double> &chi2);
     void Process(const art::Event& evt, bool &isFiducial);
     void truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac, double &Ecomplet);
     double truthLength( const simb::MCParticle *MCparticle );
@@ -90,7 +90,11 @@ private:
     std::string fShowerModuleLabel;
     std::string fPointIDModuleLabel;
     std::string fNNetModuleLabel;
+    std::string fPFParticleModuleLabel;
+    double      fExponentConstant;
     double 	fPIDA_endPoint;
+    double	fMaxPIDAValue;
+    double	fMinPIDAValue;
     bool	fSaveMCTree; 
  
     TTree *fEventTree;
@@ -120,13 +124,18 @@ private:
     double decayVtx[MAX_TRACKS][3];
     int    n_recoTracks;
     int    track_isContained[MAX_TRACKS];
+    double track_vtxDir[MAX_TRACKS][3];
     double track_vtx[MAX_TRACKS][4];
     double track_end[MAX_TRACKS][4];
     double track_length[MAX_TRACKS]; 
     double track_dir_vtx[MAX_TRACKS][4]; 
-    double track_PIDA[MAX_TRACKS];
-    int	   track_PID_pdg[MAX_TRACKS];
-    double track_KE[MAX_TRACKS];
+    double track_PIDA_bp[MAX_TRACKS];
+    double track_PIDA[MAX_TRACKS][3];
+    double track_PIDA_chi2[MAX_TRACKS][3];
+    int	   track_PID_pdg[MAX_TRACKS][3];
+    int	   track_PID_pdg_bp[MAX_TRACKS];
+    double track_KE[MAX_TRACKS][3];
+    double track_KE_bp[MAX_TRACKS];
     double track_Prange[MAX_TRACKS];
     double track_Efrac[MAX_TRACKS];
     double track_complet[MAX_TRACKS];
@@ -134,7 +143,7 @@ private:
     int    track_mcPDG[MAX_TRACKS];
 
     int     n_recoHits;
-    int  hit_channel[MAX_HITS];
+    int     hit_channel[MAX_HITS];
     int     hit_tpc[MAX_HITS];
     int     hit_plane[MAX_HITS];
     int     hit_wire[MAX_HITS];
@@ -210,7 +219,7 @@ NDKAna::NDKAna(fhicl::ParameterSet const& parameterSet)
     : EDAnalyzer(parameterSet), fCalorimetryAlg(parameterSet.get< fhicl::ParameterSet >("CalorimetryAlg"))
     
 {
-    //reconfigure(parameterSet);
+    reconfigure(parameterSet);
 }
 //========================================================================
 NDKAna::~NDKAna(){
@@ -219,7 +228,6 @@ NDKAna::~NDKAna(){
 //========================================================================
 void NDKAna::reconfigure(fhicl::ParameterSet const& p)
 {
-//NDKAna::NDKAna(fhicl::ParameterSet const& parameterSet){
 
     fHitModuleLabel      = p.get<std::string>("HitModuleLabel");
     fTrackModuleLabel    = p.get<std::string>("TrackModuleLabel");
@@ -228,9 +236,12 @@ void NDKAna::reconfigure(fhicl::ParameterSet const& p)
     fPointIDModuleLabel  = p.get<std::string>("PointIDModuleLabel");
     fNNetModuleLabel     = p.get<std::string>("NNetModuleLabel");
     fSaveHits		 = p.get<bool>("SaveHits");
-    fPidValue 	 	 = p.get<double>("PidValue");
-    fView                = p.get<double>("View");
+    fExponentConstant 	 = p.get<double>("ExponentConstant");
+    fMaxPIDAValue 	 = p.get<double>("MaxPIDAValue");
+    fMinPIDAValue 	 = p.get<double>("MinPIDAValue");
     fPIDA_endPoint	 = p.get<double>("PIDA_endPoint");
+    fView                = p.get<double>("View");
+    fPidValue		 = p.get<double>("PidValue");
     fFidVolCutX          = p.get<double>("FidVolCutX");
     fFidVolCutY          = p.get<double>("FidVolCutY");
     fFidVolCutZ          = p.get<double>("FidVolCutZ");
@@ -304,12 +315,17 @@ void NDKAna::beginJob(){
   fEventTree->Branch("n_decayVtx", &n_decayVtx);
   fEventTree->Branch("decayVtx", &decayVtx,"decayVtx[n_decayVtx][3]/D");
   fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
+  fEventTree->Branch("track_vtxDir", &track_vtxDir,"track_vtxDir[n_reco_tracks][3]/D");
   fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
   fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
   fEventTree->Branch("track_length", &track_length,"track_length[n_reco_tracks]/D");
-  fEventTree->Branch("track_PIDA", &track_PIDA,"track_PIDA[n_reco_tracks]/D");
-  fEventTree->Branch("track_PID_pdg", &track_PID_pdg,"track_PID_pdg[n_reco_tracks]/I");
-  fEventTree->Branch("track_KE", &track_KE,"track_KE[n_reco_tracks]/D");
+  fEventTree->Branch("track_PIDA_bp", &track_PIDA_bp,"track_PIDA_bp[n_reco_tracks]/D");
+  fEventTree->Branch("track_PIDA", &track_PIDA,"track_PIDA[n_reco_tracks][3]/D");
+  fEventTree->Branch("track_PIDA_chi2", &track_PIDA_chi2,"track_PIDA_chi2[n_reco_tracks][3]/D");
+  fEventTree->Branch("track_PID_pdg", &track_PID_pdg,"track_PID_pdg[n_reco_tracks][3]/I");
+  fEventTree->Branch("track_PID_pdg_bp", &track_PID_pdg_bp,"track_PID_pdg_bp[n_reco_tracks]/I");
+  fEventTree->Branch("track_KE", &track_KE,"track_KE[n_reco_tracks][3]/D");
+  fEventTree->Branch("track_KE_bp", &track_KE_bp,"track_KE_bp[n_reco_tracks]/D");
   fEventTree->Branch("track_Prange", &track_Prange,"track_Prange[n_reco_tracks]/D");
   fEventTree->Branch("track_complet", &track_complet,"track_complet[n_reco_tracks]/D");
   fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");
@@ -375,7 +391,7 @@ void NDKAna::beginRun(const art::Run& /*run*/){
 //========================================================================
 void NDKAna::analyze( const art::Event& event ){
     if (event.isRealData()) return;
-    reset();
+    //reset();
 
     Event  = event.id().event(); 
     Run    = event.run();
@@ -422,14 +438,13 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     // Reco  stuff
     //========================================================================
     //========================================================================
+    
     //this is a track base analysis so it must be at least one track
     art::Handle< std::vector<recob::Track> > trackListHandle;
     std::vector<art::Ptr<recob::Track>> tracklist;
     if( event.getByLabel(fTrackModuleLabel, trackListHandle)) 
       art::fill_ptr_vector(tracklist, trackListHandle);
-
     n_recoTracks = tracklist.size();
-    //cout<<"n trks  "<<n_recoTracks<<endl;
     if( n_recoTracks > MAX_TRACKS || n_recoTracks == 0) return;
     
     art::Handle< std::vector<recob::Vertex> > vtxListHandle;
@@ -473,7 +488,12 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_end[i][1] =tmp_track_end[1];
        track_end[i][2] =tmp_track_end[2];
        track_end[i][3] = -999.0;
-    
+   
+       const TVector3 tmp_vtx_dir = track->VertexDirection();
+       track_vtxDir[i][0] = tmp_vtx_dir[0]; 
+       track_vtxDir[i][1] = tmp_vtx_dir[1]; 
+       track_vtxDir[i][2] = tmp_vtx_dir[2]; 
+
        track_Prange[i] = trackP.GetTrackMomentum(track_length[i],13); 
        double trk_end[4] ={tmp_track_end[0],tmp_track_end[1],tmp_track_end[2],-999};
        bool track_isInside = insideFV( trk_end );
@@ -483,23 +503,38 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        //calculate PID 
        std::vector<const anab::Calorimetry*> trk_cal = reco_cal.at(i);
        std::vector<const anab::ParticleID*> trk_pid = reco_PID.at(i);
-       int best_plane;
+
        int plane0 =   trk_pid[0]->Ndf();
        int plane1 =   trk_pid[1]->Ndf();
        int plane2 =   trk_pid[2]->Ndf();
-       if((plane0 >= plane1) && (plane0 >= plane2)) {
-         best_plane = 0;
-       }
-       else if ((plane1 >= plane0) && (plane1 >= plane2)) {
-         best_plane = 1;
-       }
-       else {
-         best_plane = 2;
-       }
-       track_PID_pdg[i] = trk_pid[best_plane]->Pdg();
-       track_PIDA[i] = trk_pid[best_plane]->PIDA();
-       track_KE[i] = trk_cal[best_plane]->KineticEnergy();
+       int best_plane =-1;
+       int most_ndf = std::max({plane0, plane1, plane2});
+       for( size_t p =0; p<3; p++) if( most_ndf == trk_pid[p]->Ndf() ) best_plane = p;
 
+       track_PID_pdg[i][0] = trk_pid[0]->Pdg();
+       track_PID_pdg[i][1] = trk_pid[1]->Pdg();
+       track_PID_pdg[i][2] = trk_pid[2]->Pdg();
+       track_KE[i][0] = trk_cal[0]->KineticEnergy();
+       track_KE[i][1] = trk_cal[1]->KineticEnergy();
+       track_KE[i][2] = trk_cal[2]->KineticEnergy();
+
+       std::vector<double> PIDAval;
+       std::vector<double> chi2;
+       PIDAcal( trk_cal, PIDAval, chi2); 
+       int idx =0;
+       for(auto const& val : PIDAval){
+          track_PIDA[i][idx] = val;
+          idx ++;
+       }
+       idx =0;
+       for(auto const& val : chi2){
+          track_PIDA_chi2[i][idx] = val;
+          idx ++;
+       }
+
+       track_PIDA_bp[i] = track_PIDA[i][best_plane]; 
+       track_PID_pdg_bp[i] = trk_pid[best_plane]->Pdg();
+       track_KE_bp[i] = trk_cal[best_plane]->KineticEnergy();
        //truth matcher
        double tmpEfrac = 0;
        const simb::MCParticle *particle;
@@ -511,15 +546,12 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_mcPDG[i] = particle->PdgCode();
        track_Efrac[i] = tmpEfrac; 
        track_complet[i] = tmpComplet;
-    
-
     }
     //CNN dacayID vertex 
     art::Handle<std::vector<recob::Vertex>> dcy_vtxHandle;
     std::vector<art::Ptr<recob::Vertex>> dcy_vtxlist;
     if(event.getByLabel(fPointIDModuleLabel,dcy_vtxHandle)) 
       art::fill_ptr_vector(dcy_vtxlist, dcy_vtxHandle); 
-
     n_decayVtx= dcy_vtxlist.size();
    
     //art::FindManyP<recob::Track> decay_tracklist(dcy_vtxHandle, event, fPointIDModuleLabel);
@@ -530,7 +562,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        for( int j=0; j<3; ++j) decayVtx[i][j]=tmp_vtx[j]; 
        //std::vector<art::Ptr<recob::Track>>  decay_track = decay_tracklist.at(i);
        //cout<<"how many tracks? "<<decay_track.size()<<endl;
-    } 
+    }
     //CNN Em-trk hits
     //Imported code from PointIdEffTest_module.cc 
     //to included hit and CNN output info into the analysis module
@@ -589,6 +621,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        for( size_t j =0; j<shower->MIPEnergy().size(); j++) sh_MIPenergy[i][j] = shower->MIPEnergy()[j];
        for( size_t j =0; j<shower->dEdx().size(); j++) sh_dEdx[i][j] = shower->dEdx()[j];
     }
+
     if( fSaveHits ){
       //Hits
       art::Handle<std::vector<recob::Hit>> HitHandle;
@@ -665,6 +698,79 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     }
      */     
     //cout<<"pass all "<<isFiducial<<endl; 
+}
+//========================================================================
+void NDKAna::PIDAcal( std::vector<const anab::Calorimetry*> cal, std::vector<double> &PIDA, std::vector<double> &chi2){
+  std::vector<double> pida_vec_v0;
+  std::vector<double> pida_vec_v1;
+  std::vector<double> pida_vec_v2;
+
+  int used_points[3] ={0,0,0};
+  double tmp_pida[3];
+  for( unsigned j =0; j<3; ++j){
+     for( unsigned i =0; i<cal[j]->dEdx().size(); ++i ) { // loop through hits on each plane
+        if( cal[j]->ResidualRange()[i] < fPIDA_endPoint ) { // Only want PIDA for last x cm
+          tmp_pida[j] = cal[j]->dEdx()[i]* pow(cal[j]->ResidualRange()[i], fExponentConstant ); 
+          if(fMinPIDAValue > tmp_pida[j] || tmp_pida[j] > fMaxPIDAValue) continue;
+          if( j ==  0 )pida_vec_v0.push_back(tmp_pida[j]);
+          if( j ==  1 )pida_vec_v1.push_back(tmp_pida[j]);
+          if( j ==  2 )pida_vec_v2.push_back(tmp_pida[j]);
+          used_points[j] ++;
+        } // If ResRange < x cm
+     }// Loop over hits on each plane
+  }
+
+  
+  //for each view calculate PIDA
+  double pida_mean_v0 = 0;
+  double pida_sigma_v0 =0;
+  double pida_chi2_v0=0;
+  if( pida_vec_v0.size() != 0){
+    for(auto const& val : pida_vec_v0) pida_mean_v0 += val;
+    pida_mean_v0 /= used_points[0];
+    for(auto const& val : pida_vec_v0) pida_sigma_v0 +=pow((val-pida_mean_v0),2);
+    pida_sigma_v0 = std::sqrt(pida_sigma_v0/(used_points[0]));
+    for(auto const& val : pida_vec_v0) pida_chi2_v0 +=pow((val-pida_mean_v0),2);
+    pida_chi2_v0 /= pida_sigma_v0;
+  }
+  pida_chi2_v0 /= used_points[0];
+
+  double pida_mean_v1 = 0;
+  double pida_sigma_v1 =0;
+  double pida_chi2_v1=0;
+  if( pida_vec_v1.size() != 0){
+    for(auto const& val : pida_vec_v1) pida_mean_v1 += val;
+    pida_mean_v1 /= used_points[1];
+    for(auto const& val : pida_vec_v1) pida_sigma_v1 +=pow((val-pida_mean_v1),2);
+    pida_sigma_v1 = std::sqrt(pida_sigma_v1/(used_points[1]));
+    for(auto const& val : pida_vec_v1) pida_chi2_v1 +=pow((val-pida_mean_v1),2);
+    pida_chi2_v1 /= pida_sigma_v1;
+  }
+  pida_chi2_v1 /= used_points[1];
+
+  double pida_mean_v2 = 0;
+  double pida_sigma_v2 =0;
+  double pida_chi2_v2=0;
+  if( pida_vec_v2.size() != 0){
+    for(auto const& val : pida_vec_v2) pida_mean_v2 += val;
+    pida_mean_v2 /= used_points[2];
+    for(auto const& val : pida_vec_v2) pida_sigma_v2 +=pow((val-pida_mean_v2),2);
+    pida_sigma_v2 = std::sqrt(pida_sigma_v2/(used_points[2]));
+    for(auto const& val : pida_vec_v2) pida_chi2_v2 +=pow((val-pida_mean_v2),2);
+    pida_chi2_v2 /= pida_sigma_v2;
+  }
+  pida_chi2_v2 /= used_points[2];
+ 
+  if( isnan(pida_chi2_v0) ) pida_chi2_v0= 999;
+  if( isnan(pida_chi2_v1) ) pida_chi2_v1= 999;
+  if( isnan(pida_chi2_v2) ) pida_chi2_v2= 999;
+
+  PIDA.push_back(pida_mean_v0);
+  PIDA.push_back(pida_mean_v1);
+  PIDA.push_back(pida_mean_v2);
+  chi2.push_back(pida_chi2_v0);
+  chi2.push_back(pida_chi2_v1);
+  chi2.push_back(pida_chi2_v2);
 }
 //========================================================================
 void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac, double &Ecomplet){
@@ -787,7 +893,7 @@ void NDKAna::reset(){
        MC_pdg[i] = -999;
        MC_mother[i] = -999;
        MC_truthlength[i] = -999.0;
-       track_PIDA[i] = -999.0;
+       //track_PIDA[i] = -999.0;
        track_Prange[i] =-999.0;
        track_Efrac[i] = -999.0; 
        track_complet[i] =-999.0;
@@ -795,8 +901,8 @@ void NDKAna::reset(){
        track_length[i] = -999;
        track_isContained[i]= -999;
        track_mcPDG[i] =-999;
-       track_KE[i] =-999.0;
-       track_PID_pdg[i] = -999;
+       //track_KE[i] =-999.0;
+       //track_PID_pdg[i] = -999;
        for(int j=0; j<4; ++j) {
           MC_startXYZT[i][j]      = -999.0;
           MC_endXYZT[i][j]        = -999.0;
