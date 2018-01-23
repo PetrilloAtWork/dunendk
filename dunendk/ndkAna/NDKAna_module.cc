@@ -20,8 +20,8 @@
 #include "lardataobj/RecoBase/Shower.h"
 #include "lardataobj/RecoBase/OpHit.h"
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
-#include "larsim/MCCheater/BackTracker.h"
-#include "larsim/MCCheater/PhotonBackTracker.h"
+#include "larsim/MCCheater/BackTrackerService.h"
+#include "larsim/MCCheater/ParticleInventoryService.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "larreco/Calorimetry/CalorimetryAlg.h"
@@ -91,6 +91,7 @@ private:
     std::string fPointIDModuleLabel;
     std::string fNNetModuleLabel;
     std::string fPFParticleModuleLabel;
+    std::string fMCgenieLabel;
     double      fExponentConstant;
     double 	fPIDA_endPoint;
     double	fMaxPIDAValue;
@@ -116,8 +117,11 @@ private:
     double MC_endMomentum[MAX_TRACKS][4];  
     double MC_truthlength[MAX_TRACKS];
     double MC_Prange[MAX_TRACKS];
- 
-
+    double MC_Ev;
+    int    MC_nuPDG;
+    double MC_Q2;
+    double MC_hit_nucleon; 
+    int    MC_cc;
     int    n_vertices;
     double vertex[MAX_TRACKS][4];
     int    n_decayVtx;
@@ -238,6 +242,7 @@ void NDKAna::reconfigure(fhicl::ParameterSet const& p)
     fShowerModuleLabel	 = p.get<std::string>("ShowerModuleLabel");
     fPointIDModuleLabel  = p.get<std::string>("PointIDModuleLabel");
     fNNetModuleLabel     = p.get<std::string>("NNetModuleLabel");
+    fMCgenieLabel	 = p.get<std::string>("MCgenieLabel");
     fSaveHits		 = p.get<bool>("SaveHits");
     fExponentConstant 	 = p.get<double>("ExponentConstant");
     fMaxPIDAValue 	 = p.get<double>("MaxPIDAValue");
@@ -300,6 +305,13 @@ void NDKAna::beginJob(){
   fEventTree->Branch("eventNo", &Event);
   fEventTree->Branch("runNo", &Run);
   fEventTree->Branch("subRunNo", &SubRun);
+
+  fEventTree->Branch("MC_Ev", &MC_Ev);
+  fEventTree->Branch("MC_cc", &MC_cc);
+  fEventTree->Branch("MC_Q2", &MC_Q2);
+  fEventTree->Branch("MC_nuPDG", &MC_nuPDG);
+  fEventTree->Branch("MC_hit_nucleon", &MC_hit_nucleon);
+
   fEventTree->Branch("mc_vertex", &MC_vertex, "mc_vertex[4]/D");
   fEventTree->Branch("mc_npart", &MC_npart);  // number of particles 
   fEventTree->Branch("mc_id", &MC_id, "mc_id[mc_npart]/I");  
@@ -410,8 +422,33 @@ void NDKAna::analyze( const art::Event& event ){
 //========================================================================
 void NDKAna::Process( const art::Event& event, bool &isFiducial){
 
-    art::ServiceHandle<cheat::BackTracker> bt;
-    const sim::ParticleList& plist = bt->ParticleList();
+    //save GENIE stuf for atmos
+    art::Handle<std::vector<simb::MCTruth>> MCtruthHandle;
+    std::vector<art::Ptr<simb::MCTruth>> MCtruthlist;
+    if(event.getByLabel(fMCgenieLabel, MCtruthHandle))
+      art::fill_ptr_vector(MCtruthlist, MCtruthHandle);
+    
+    //For now assume that there is only one neutrino interaction...
+    art::Ptr<simb::MCTruth> MCtruth; 
+    if( MCtruthlist.size()>0 ){
+      MCtruth = MCtruthlist[0];
+      if( MCtruth->NeutrinoSet() ){
+        simb::MCNeutrino nu = MCtruth->GetNeutrino();
+        if( nu.CCNC() == 0 ) MC_cc = 1;
+        else if ( nu.CCNC() == 1 ) MC_cc = 0; 
+        simb::MCParticle neutrino = nu.Nu();
+        MC_nuPDG = nu.Nu().PdgCode();
+        const TLorentzVector& nu_momentum = nu.Nu().Momentum(0); 
+        double MC_incoming_P[4];
+        nu_momentum.GetXYZT(MC_incoming_P); 
+        MC_Ev = nu_momentum[3];
+        MC_Q2 = nu.QSqr();
+        MC_hit_nucleon = nu.HitNuc();
+      }
+    }
+    //art::ServiceHandle<cheat::BackTrackerService> bt;
+    art::ServiceHandle<cheat::ParticleInventoryService> part_inv;
+    const sim::ParticleList& plist = part_inv->ParticleList();
     simb::MCParticle *particle=0;
     int i=0; // particle index
     MC_npart = plist.size();
@@ -654,7 +691,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     /*
     //PDS info... this may be useful for background rejection
 
-    art::ServiceHandle<cheat::PhotonBackTracker> Photon_bt;
+    art::ServiceHandle<cheat::PhotonBackTrackerService> Photon_bt;
     art::Handle< std::vector<recob::OpFlash> > flashListHandle;
     std::vector<art::Ptr<recob::OpFlash> > flashlist;
     if(event.getByLabel(fOpFlashModuleLabel,flashListHandle))
@@ -751,11 +788,12 @@ void NDKAna::PIDAcal( std::vector<const anab::Calorimetry*> cal, std::vector<dou
 //========================================================================
 void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vector<art::Ptr<recob::Hit>> track_hits, const simb::MCParticle *&MCparticle, double &Efrac, double &Ecomplet){
 
-    art::ServiceHandle<cheat::BackTracker> bt;
+    art::ServiceHandle<cheat::BackTrackerService> bt;
+    art::ServiceHandle<cheat::ParticleInventoryService> part_inv;
     std::map<int,double> trkID_E;
     for(size_t j = 0; j < track_hits.size(); ++j){
        art::Ptr<recob::Hit> hit = track_hits[j];
-       std::vector<sim::TrackIDE> TrackIDs = bt->HitToTrackID(hit);
+       std::vector<sim::TrackIDE> TrackIDs = bt->HitToTrackIDEs(hit);
        for(size_t k = 0; k < TrackIDs.size(); k++){
           trkID_E[TrackIDs[k].trackID] += TrackIDs[k].energy;
        }            
@@ -780,7 +818,7 @@ void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vect
          if( TrackID < 0 ) E_em += ii->second;
        }
     } 
-    MCparticle = bt->TrackIDToParticle(TrackID);
+    MCparticle = part_inv->TrackIdToParticle_P(TrackID);
 
     //In the current simulation, we do not save EM Shower daughters in GEANT. But we do save the energy deposition in TrackIDEs. If the energy deposition is from a particle that is the daughter of 
     //an EM particle, the negative of the parent track ID is saved in TrackIDE for the daughter particle
@@ -794,7 +832,7 @@ void NDKAna::truthMatcher( std::vector<art::Ptr<recob::Hit>> all_hits, std::vect
     double totenergy =0;
     for(size_t k = 0; k < all_hits.size(); ++k){
        art::Ptr<recob::Hit> hit = all_hits[k];
-       std::vector<sim::TrackIDE> TrackIDs = bt->HitToTrackID(hit);
+       std::vector<sim::TrackIDE> TrackIDs = bt->HitToTrackIDEs(hit);
        for(size_t l = 0; l < TrackIDs.size(); ++l){
           if(TrackIDs[l].trackID==TrackID) totenergy += TrackIDs[l].energy;
        }
