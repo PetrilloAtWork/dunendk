@@ -13,8 +13,9 @@
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Cluster.h"  
 #include "larcoreobj/SimpleTypesAndConstants/geo_types.h"
-#include "larsim/MCCheater/BackTracker.h"
-#include "larsim/MCCheater/PhotonBackTracker.h"
+#include "larsim/MCCheater/BackTrackerService.h"
+#include "larsim/MCCheater/ParticleInventoryService.h"
+//#include "larsim/MCCheater/PhotonBackTracker.h"
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
 #include "lardata/DetectorInfoServices/DetectorClocksService.h"
 #include "lardataobj/RecoBase/Vertex.h"
@@ -325,8 +326,9 @@ void NDKPDAna::analyze( const art::Event& event ){
 //========================================================================
 void NDKPDAna::Process( const art::Event& event, bool &isFiducial){
     
-    art::ServiceHandle<cheat::BackTracker> bt;
-    const sim::ParticleList& plist = bt->ParticleList();
+    art::ServiceHandle<cheat::ParticleInventoryService> part_inv;
+    
+    const sim::ParticleList& plist = part_inv->ParticleList();
     simb::MCParticle *particle=0;
     int i=0; // particle index
     MC_npart = plist.size();
