@@ -133,12 +133,10 @@ private:
     double track_end[MAX_TRACKS][4];
     double track_length[MAX_TRACKS]; 
     double track_dir_vtx[MAX_TRACKS][4]; 
-    double track_PIDA_bp[MAX_TRACKS];
     double track_PIDA[MAX_TRACKS][3];
     int	   track_PID_pdg[MAX_TRACKS][3];
-    int	   track_PID_pdg_bp[MAX_TRACKS];
     double track_KE[MAX_TRACKS][3];
-    double track_KE_bp[MAX_TRACKS];
+    int    track_bestplane[MAX_TRACKS];
     double track_Prange[MAX_TRACKS];
     double track_Efrac[MAX_TRACKS];
     double track_complet[MAX_TRACKS];
@@ -328,27 +326,25 @@ void NDKAna::beginJob(){
   fEventTree->Branch("vertex", &vertex,"vertex[n_vertices][4]/D");
   fEventTree->Branch("n_reco_tracks", &n_recoTracks);
   fEventTree->Branch("n_decayVtx", &n_decayVtx);
-  fEventTree->Branch("decayVtx", &decayVtx,"decayVtx[n_decayVtx][3]/D");
+  fEventTree->Branch("decayVtx", &decayVtx,"decayVtx[n_decayVtx][3]/D");  //vertices found using decayID point Alg
   fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
   fEventTree->Branch("track_vtxDir", &track_vtxDir,"track_vtxDir[n_reco_tracks][3]/D");
   fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
   fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
   fEventTree->Branch("track_length", &track_length,"track_length[n_reco_tracks]/D");
-  fEventTree->Branch("track_PIDA_bp", &track_PIDA_bp,"track_PIDA_bp[n_reco_tracks]/D");
   fEventTree->Branch("track_PIDA", &track_PIDA,"track_PIDA[n_reco_tracks][3]/D");
   fEventTree->Branch("track_PID_pdg", &track_PID_pdg,"track_PID_pdg[n_reco_tracks][3]/I");
-  fEventTree->Branch("track_PID_pdg_bp", &track_PID_pdg_bp,"track_PID_pdg_bp[n_reco_tracks]/I");
   fEventTree->Branch("track_KE", &track_KE,"track_KE[n_reco_tracks][3]/D");
-  fEventTree->Branch("track_KE_bp", &track_KE_bp,"track_KE_bp[n_reco_tracks]/D");
   fEventTree->Branch("track_Prange", &track_Prange,"track_Prange[n_reco_tracks]/D");
+  fEventTree->Branch("track_bestplane", &track_bestplane,"track_bestplane[n_reco_tracks]/I");
   fEventTree->Branch("n_cal_points", &n_cal_points);
   fEventTree->Branch("track_dQ_dx", &track_dQ_dx,"track_dQ_dx[n_cal_points]/D");
   fEventTree->Branch("track_dE_dx", &track_dE_dx,"track_dE_dx[n_cal_points]/D");
   fEventTree->Branch("track_range", &track_range,"track_range[n_cal_points]/D");
-  fEventTree->Branch("track_complet", &track_complet,"track_complet[n_reco_tracks]/D");
-  fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");
-  fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");
-  fEventTree->Branch("track_mcPDG", &track_mcPDG,"track_mcPDG[n_reco_tracks]/I");
+  fEventTree->Branch("track_complet", &track_complet,"track_complet[n_reco_tracks]/D");  //track quality variable (completeness) 
+  fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");        //track quality variable (purity)
+  fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");           //true MC ID for a given track
+  fEventTree->Branch("track_mcPDG", &track_mcPDG,"track_mcPDG[n_reco_tracks]/I");        //true MC PDG for a given track
 
   fEventTree->Branch("Em_ch", &Em_ch);
   fEventTree->Branch("Em_e", &Em_e);
@@ -570,10 +566,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
           track_PIDA[i][idx] = val;
           idx ++;
        }
-       track_PIDA_bp[i] = track_PIDA[i][best_plane]; 
-       track_PID_pdg_bp[i] = trk_pid[best_plane]->Pdg();
-       track_KE_bp[i] = trk_cal[best_plane]->KineticEnergy();
-
+       track_bestplane[i] = best_plane;
       
        //save dE/dx & dQ/dx
        n_cal_points = trk_cal[best_plane]->dEdx().size();
@@ -637,12 +630,12 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
               double PidValue = vout[trk_idx] / p_trk_or_sh;
               if( PidValue < fPidValue ){
                 Em_ch += h->SummedADC()* fCalorimetryAlg.LifetimeCorrection( h->PeakTime() );
-                Em_e  += fCalorimetryAlg.ElectronsFromADCArea( h->Integral(), h->WireID().Plane) * fCalorimetryAlg.LifetimeCorrection( h->PeakTime() );
+                Em_e  += (fCalorimetryAlg.ElectronsFromADCArea( h->Integral(), h->WireID().Plane) * fCalorimetryAlg.LifetimeCorrection( h->PeakTime() ) ) / util::kGeVToElectrons;
                 //Michel hits
                 //if( vout[michel_idx] > 0.1 ) //temporay
                 //Emichel_e  += fCalorimetryAlg.ElectronsFromADCArea( h->Integral(), h->WireID().Plane) * fCalorimetryAlg.LifetimeCorrection( h->PeakTime() );
               }
-              else  trk_e += fCalorimetryAlg.ElectronsFromADCArea( h->Integral(), h->WireID().Plane) * fCalorimetryAlg.LifetimeCorrection( h->PeakTime() ); 
+              else  trk_e += (fCalorimetryAlg.ElectronsFromADCArea( h->Integral(), h->WireID().Plane) * fCalorimetryAlg.LifetimeCorrection( h->PeakTime() ) ) / util::kGeVToElectrons; 
 	   }           
          }
       }
