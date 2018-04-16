@@ -77,6 +77,7 @@ private:
     int    MC_pdg[MAX_TRACKS]; 
     int    MC_mother[MAX_TRACKS];  
     int    MC_statusCode[MAX_TRACKS];
+    int    MC_fate[MAX_TRACKS];
     double MC_startXYZT[MAX_TRACKS][4]; 
     double MC_endXYZT[MAX_TRACKS][4];  
     double MC_startMomentum[MAX_TRACKS][4]; 
@@ -114,6 +115,7 @@ void GENIE::beginJob(){
   fEventTree->Branch("mc_vertex", &MC_vertex, "mc_vertex[4]/D");
   fEventTree->Branch("mc_id", &MC_id, "mc_id[mc_npart]/I");  
   fEventTree->Branch("mc_pdg", &MC_pdg, "mc_pdg[mc_npart]/I"); 
+  fEventTree->Branch("mc_fate", &MC_fate, "mc_fate[mc_npart]/I"); 
   fEventTree->Branch("mc_statusCode", &MC_statusCode, "mc_statusCode[mc_npart]/I"); 
   fEventTree->Branch("mc_mother", &MC_mother, "mc_mother[mc_npart]/I"); 
   fEventTree->Branch("mc_startXYZT", &MC_startXYZT, "mc_startXYZT[mc_npart][4]/D");  
@@ -159,6 +161,7 @@ void GENIE::Process( const art::Event& event){
        MC_pdg[i] = particle.PdgCode();
        MC_mother[i] = particle.Mother();
        MC_statusCode[i] =particle.StatusCode();
+       MC_fate[i] = particle.Rescatter();
        const TLorentzVector& positionStart = particle.Position(0);
        const TLorentzVector& positionEnd   = particle.EndPosition();
        const TLorentzVector& momentumStart = particle.Momentum(0);
@@ -185,6 +188,7 @@ void GENIE::reset(){
        MC_pdg[i] = -999;
        MC_mother[i] = -999;
        MC_statusCode[i] = -999;
+       MC_fate[i] = -999;
        for(int j=0; j<4; ++j) {
           MC_startXYZT[i][j]      = -999.0;
           MC_endXYZT[i][j]        = -999.0;

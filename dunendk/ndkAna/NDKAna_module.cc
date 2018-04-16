@@ -106,6 +106,20 @@ private:
     int SubRun;
 
     //MC truth
+    double MC_Ev;
+    int    MC_nuPDG;
+    double MC_Q2;
+    double MC_hit_nucleon; 
+    int    MC_cc;
+    int    MCgenie_npart;
+    int    MCgenie_id[MAX_TRACKS];  
+    int    MCgenie_pdg[MAX_TRACKS]; 
+    int    MCgenie_mother[MAX_TRACKS];  
+    int    MCgenie_statusCode[MAX_TRACKS];
+    int    MCgenie_fate[MAX_TRACKS];
+    double MCgenie_startMomentum[MAX_TRACKS][4]; 
+    double MCgenie_endMomentum[MAX_TRACKS][4];  
+ 
     double MC_vertex[4];
     int    MC_npart;  
     int    MC_id[MAX_TRACKS];  
@@ -117,11 +131,6 @@ private:
     double MC_endMomentum[MAX_TRACKS][4];  
     double MC_truthlength[MAX_TRACKS];
     double MC_Prange[MAX_TRACKS];
-    double MC_Ev;
-    int    MC_nuPDG;
-    double MC_Q2;
-    double MC_hit_nucleon; 
-    int    MC_cc;
     int    n_vertices;
     double vertex[MAX_TRACKS][4];
     int    n_decayVtx;
@@ -304,12 +313,21 @@ void NDKAna::beginJob(){
   fEventTree->Branch("runNo", &Run);
   fEventTree->Branch("subRunNo", &SubRun);
 
+  //GENIE info & list of particles
   fEventTree->Branch("MC_Ev", &MC_Ev);
   fEventTree->Branch("MC_cc", &MC_cc);
   fEventTree->Branch("MC_Q2", &MC_Q2);
   fEventTree->Branch("MC_nuPDG", &MC_nuPDG);
   fEventTree->Branch("MC_hit_nucleon", &MC_hit_nucleon);
-
+  fEventTree->Branch("mcgenie_npart", &MCgenie_npart);  // number of particles 
+  fEventTree->Branch("mcgenie_id", &MCgenie_id, "mcgenie_id[mcgenie_npart]/I");  
+  fEventTree->Branch("mcgenie_fate", &MCgenie_fate, "mcgenie_fate[mcgenie_npart]/I");  
+  fEventTree->Branch("mcgenie_pdg", &MCgenie_pdg, "mcgenie_pdg[mcgenie_npart]/I"); 
+  fEventTree->Branch("mcgenie_mother", &MCgenie_mother, "mcgenie_mother[mcgenie_npart]/I"); 
+  fEventTree->Branch("mcgenie_startMomentum", &MCgenie_startMomentum, "mcgenie_startMomentum[mcgenie_npart][4]/D");  
+  fEventTree->Branch("mcgenie_endMomentum", &MCgenie_endMomentum, "mcgenie_endMomentum[mcgenie_npart][4]/D"); 
+ 
+  //Geant4 list of particles 
   fEventTree->Branch("mc_vertex", &MC_vertex, "mc_vertex[4]/D");
   fEventTree->Branch("mc_npart", &MC_npart);  // number of particles 
   fEventTree->Branch("mc_id", &MC_id, "mc_id[mc_npart]/I");  
@@ -405,7 +423,6 @@ void NDKAna::beginRun(const art::Run& /*run*/){
 //========================================================================
 void NDKAna::analyze( const art::Event& event ){
     if (event.isRealData()) return;
-    //reset();
 
     Event  = event.id().event(); 
     Run    = event.run();
@@ -441,6 +458,22 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
         MC_Q2 = nu.QSqr();
         MC_hit_nucleon = nu.HitNuc();
       }
+      MCgenie_npart = MCtruth->NParticles();
+      for( int i =0; i<MCgenie_npart; ++i ){ 
+         simb::MCParticle particle = MCtruth->GetParticle(i);
+         MCgenie_id[i] = particle.TrackId();
+         MCgenie_pdg[i] = particle.PdgCode();
+         MCgenie_mother[i] = particle.Mother();
+         MCgenie_statusCode[i] =particle.StatusCode();
+         MCgenie_fate[i] = particle.Rescatter();
+         const TLorentzVector& momentumStart = particle.Momentum(0);
+         const TLorentzVector& momentumEnd   = particle.EndMomentum();
+         //!Save the true vertex as the vertex using primaries ...hmmm do you have another suggestion?
+         momentumStart.GetXYZT(MCgenie_startMomentum[i]);
+         momentumEnd.GetXYZT(MCgenie_endMomentum[i]);
+      
+    }
+
     }
     //art::ServiceHandle<cheat::BackTrackerService> bt;
     art::ServiceHandle<cheat::ParticleInventoryService> part_inv;
@@ -884,75 +917,6 @@ bool NDKAna::insideFV( double vertex[4]){
        return true;
      else
        return false;
-}
-//========================================================================
-//========================================================================
-void NDKAna::reset(){
-
-   MC_npart =0; 
-   n_recoTracks =0;
-   n_vertices = 0;
-   n_decayVtx =0;
-   for(int i = 0; i<4; ++i){
-      MC_vertex[i] = -999.0;
-   }
-  
-   for(int i=0; i<MAX_TRACKS; ++i) {
-       MC_id[i] = -999;
-       MC_pdg[i] = -999;
-       MC_mother[i] = -999;
-       MC_truthlength[i] = -999.0;
-       //track_PIDA[i] = -999.0;
-       track_Prange[i] =-999.0;
-       track_Efrac[i] = -999.0; 
-       track_complet[i] =-999.0;
-       track_mcID[i] = -999;
-       track_length[i] = -999;
-       track_isContained[i]= -999;
-       track_mcPDG[i] =-999;
-       //track_KE[i] =-999.0;
-       //track_PID_pdg[i] = -999;
-       for(int j=0; j<4; ++j) {
-          MC_startXYZT[i][j]      = -999.0;
-          MC_endXYZT[i][j]        = -999.0;
-          MC_startMomentum[i][j]  = -999.0;
-          MC_endMomentum[i][j]    = -999.0;
-	  track_vtx[i][j] 	  = -999.0;
-	  track_end[i][j] 	  = -999.0;
-       }
-    }
-    n_recoShowers = 0;
-    for(int i=0; i<MAX_SHOWERS; ++i){
-      sh_direction_X[i] = -999.0;
-      sh_direction_Y[i] = -999.0;
-      sh_direction_Z[i] = -999.0;
-      sh_start_X[i] = -999.0;
-      sh_start_Y[i] = -999.0;
-      sh_start_Z[i] = -999.0;
-      sh_bestplane[i] = -999.0;
-      sh_length[i] = -999.0;
-      for( int j=0; j<3; j++){
-         sh_energy[i][j] = -999.0;
-         sh_MIPenergy[i][j] = -999.0;
-         sh_dEdx[i][j] = -999.0;
-      }
-    } 
-    /*
-    n_flashes =0;
-    for(int i=0; i<MAX_FLASHES; ++i){
-       flash_time[i] =-999.0;
-       flash_pe[i] =-999.0;
-       flash_ycenter[i] =-999.0;
-       flash_zcenter[i] =-999.0;
-       flash_ywidth[i] =-999.0;
-       flash_zwidth[i] =-999.0;
-       flash_timewidth[i] = -999.0;
-       flash_abstime[i] =-999.0;
-       flash_frame[i] =-999;
-       flash_PE_ndk[i] = -999;  
-       flash_PE_Ar39[i] = -999;  
-    }
-    */ 
 }
 //========================================================================
 DEFINE_ART_MODULE(NDKAna)
