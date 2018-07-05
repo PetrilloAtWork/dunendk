@@ -131,6 +131,10 @@ private:
     double MC_endMomentum[MAX_TRACKS][4];  
     double MC_truthlength[MAX_TRACKS];
     double MC_Prange[MAX_TRACKS];
+    int    MC_statusCode[MAX_TRACKS];
+    std::vector<std::string> MC_process;
+    std::vector<std::string> MC_Endprocess;
+
     int    n_vertices;
     double vertex[MAX_TRACKS][4];
     int    n_decayVtx;
@@ -322,6 +326,7 @@ void NDKAna::beginJob(){
   fEventTree->Branch("mcgenie_npart", &MCgenie_npart);  // number of particles 
   fEventTree->Branch("mcgenie_id", &MCgenie_id, "mcgenie_id[mcgenie_npart]/I");  
   fEventTree->Branch("mcgenie_fate", &MCgenie_fate, "mcgenie_fate[mcgenie_npart]/I");  
+  fEventTree->Branch("mcgenie_statusCode", &MCgenie_statusCode, "mcgenie_statusCode[mcgenie_npart]/I");  
   fEventTree->Branch("mcgenie_pdg", &MCgenie_pdg, "mcgenie_pdg[mcgenie_npart]/I"); 
   fEventTree->Branch("mcgenie_mother", &MCgenie_mother, "mcgenie_mother[mcgenie_npart]/I"); 
   fEventTree->Branch("mcgenie_startMomentum", &MCgenie_startMomentum, "mcgenie_startMomentum[mcgenie_npart][4]/D");  
@@ -332,6 +337,7 @@ void NDKAna::beginJob(){
   fEventTree->Branch("mc_npart", &MC_npart);  // number of particles 
   fEventTree->Branch("mc_id", &MC_id, "mc_id[mc_npart]/I");  
   fEventTree->Branch("mc_pdg", &MC_pdg, "mc_pdg[mc_npart]/I"); 
+  fEventTree->Branch("mc_statusCode", &MC_statusCode, "mc_statusCode[mc_npart]/I"); 
   fEventTree->Branch("mc_mother", &MC_mother, "mc_mother[mc_npart]/I"); 
   fEventTree->Branch("mc_startXYZT", &MC_startXYZT, "mc_startXYZT[mc_npart][4]/D");  
   fEventTree->Branch("mc_endXYZT", &MC_endXYZT, "mc_endXYZT[mc_npart][4]/D"); 
@@ -339,6 +345,8 @@ void NDKAna::beginJob(){
   fEventTree->Branch("mc_endMomentum", &MC_endMomentum, "mc_endMomentum[mc_npart][4]/D"); 
   fEventTree->Branch("mc_Prange", &MC_Prange, "mc_Prange[mc_npart]/D"); 
   fEventTree->Branch("mc_truthlength", &MC_truthlength, "mc_truthlength[mc_npart]/D"); 
+  fEventTree->Branch("mc_process", &MC_process); 
+  fEventTree->Branch("mc_Endprocess", &MC_Endprocess); 
 
   fEventTree->Branch("n_vertices", &n_vertices);
   fEventTree->Branch("vertex", &vertex,"vertex[n_vertices][4]/D");
@@ -487,6 +495,9 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        MC_id[i] = particle->TrackId();
        MC_pdg[i] = particle->PdgCode();
        MC_mother[i] = particle->Mother();
+       MC_process.push_back(particle->Process());
+       MC_Endprocess.push_back(particle->EndProcess());
+       MC_statusCode[i] = particle->StatusCode();
        const TLorentzVector& positionStart = particle->Position(0);
        const TLorentzVector& positionEnd   = particle->EndPosition();
        const TLorentzVector& momentumStart = particle->Momentum(0);
@@ -499,11 +510,12 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        momentumEnd.GetXYZT(MC_endMomentum[i]);
        MC_truthlength[i] = truthLength(particle);
        //MC_Prange[i] = myPrange(MC_truthlength[i]);
-      
        ++i; //paticle index
        
     }
-    
+    MC_process.resize(i);
+    MC_Endprocess.resize(i); 
+
     isFiducial =insideFV( MC_vertex );
     if( !isFiducial ) return;
     //========================================================================
