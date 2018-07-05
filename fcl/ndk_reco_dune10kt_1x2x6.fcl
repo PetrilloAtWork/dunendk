@@ -61,7 +61,8 @@ physics:
   trajcluster:          @local::dunefdmc_trajcluster
   calo:               @local::dune35t_calomc
   pandora:            @local::dunefd_pandora
-# pandora stitching module goes here when it's ready
+  pandoraTrack:       @local::dune_pandoraTrackCreation
+  pandoraShower:      @local::dune_pandoraShowerCreation
   pandoracalo:        @local::dune10kt_calomc
   pandorapid:        @local::standard_chi2pid
 
@@ -82,7 +83,7 @@ physics:
   emshower3d:            @local::dune10kt_emshower3d
   mergeemshower3d:       @local::dune10kt_mergeemshower3d
 
-  decayid:         @local::standard_particledecayid
+  #decayid:         @local::standard_particledecayid
  }
 
  #define the producer and filter modules for this path, order matters, 
@@ -100,11 +101,11 @@ physics:
          #track shower split
          emtrkmichelid, emtrkmichelidtc,
          #pandora
-         pandora, #pandora stitcher goes here
+         pandora, pandoraTrack, pandoraShower,
          pandoracalo, pandorapid,
          #pmatrack
          pmtrack, pmtrackcalo, pmtrackpid,
-         pmtracktc, pmtracktccalo, pmtracktcpid, decayid,
+         pmtracktc, pmtracktccalo, pmtracktcpid, 
          #shower reconstruction
          blurredcluster,  emshower#, emshower3d, mergeemshower3d
          ]
@@ -178,12 +179,15 @@ physics.producers.calo.SpacePointModuleLabel:           "costrk"
 #physics.producers.kalmanhit.ClusterModuleLabel:        "fuzzy"
 
 physics.producers.pandora.HitFinderModuleLabel:         "linecluster"
-physics.producers.pandoracalo.TrackModuleLabel:         "pandora"
+physics.producers.pandoraTrack.PFParticleLabel:         "pandora"
+physics.producers.pandoraShower.PFParticleLabel:        "pandora"
+
+physics.producers.pandoracalo.TrackModuleLabel:         "pandoraTrack"
 physics.producers.pandoracalo.SpacePointModuleLabel:    "pandora"
 physics.producers.pandoracalo.T0ModuleLabel:            ""
 physics.producers.pandoracalo.MakeTree:                 false
 physics.producers.pandorapid.CalorimetryModuleLabel:    "pandoracalo"
-physics.producers.pandorapid.TrackModuleLabel:          "pandora"
+physics.producers.pandorapid.TrackModuleLabel:          "pandoraTrack"
 
 
 #shower configuration
@@ -217,11 +221,11 @@ physics.producers.emtrkmichelidtc.HitModuleLabel:             "trajcluster"
 physics.producers.emtrkmichelidtc.ClusterModuleLabel:         "trajcluster"
 physics.producers.emtrkmichelidtc.Views:                      []
 
-
+## this is default reco
 physics.producers.emshower.ClusterModuleLabel:    "pandora"
 physics.producers.emshower.HitsModuleLabel:       "linecluster"
 physics.producers.emshower.PFParticleModuleLabel: "pandora"
-physics.producers.emshower.TrackModuleLabel:      "pandora"
+physics.producers.emshower.TrackModuleLabel:      "pandoraTrack"
 physics.producers.emshower.CNNEMModuleLabel:      "emtrkmichelid:emtrkmichel"
 physics.producers.emshower.UseCNNtoIDEMPFP:       true
 physics.producers.emshower.UseCNNtoIDEMHit:       false
@@ -238,12 +242,12 @@ physics.producers.mergeemshower3d.VtxModuleLabel: "emshower3d"
 physics.producers.mergeemshower3d.WideConeAngle: 20
 
 #physics.producers.decayid.PointIdAlg.NNetModelFile:      "/dune/data/users/higuera/CNN_models/decay_vtxID_gen2.nnet"
-physics.producers.decayid.PointIdAlg.NNetModelFile:      "./decay_vtxID_gen2.nnet"
-physics.producers.decayid.PointIdAlg.PatchSizeW:         40     # how many wires in patch
-physics.producers.decayid.PointIdAlg.PatchSizeD:         44     # how many downsampled ADC entries
-physics.producers.decayid.PointIdAlg.DriftWindow:        6      # downsampling window in drift ticks
-physics.producers.decayid.PointIdAlg.DownscaleFn:        "mean" # downsampling function
-physics.producers.decayid.TrackModuleLabel:              "pmtrack" # tracks to be processed
-physics.producers.decayid.PointThreshold:                0.998  # threshold on p(decay) used to select decay candidates
-physics.producers.decayid.RoiThreshold:                0.8 
+#physics.producers.decayid.PointIdAlg.NNetModelFile:      "./decay_vtxID_gen2.nnet"
+#physics.producers.decayid.PointIdAlg.PatchSizeW:         40     # how many wires in patch
+#physics.producers.decayid.PointIdAlg.PatchSizeD:         44     # how many downsampled ADC entries
+#physics.producers.decayid.PointIdAlg.DriftWindow:        6      # downsampling window in drift ticks
+#physics.producers.decayid.PointIdAlg.DownscaleFn:        "mean" # downsampling function
+#physics.producers.decayid.TrackModuleLabel:              "pmtrack" # tracks to be processed
+#physics.producers.decayid.PointThreshold:                0.998  # threshold on p(decay) used to select decay candidates
+#physics.producers.decayid.RoiThreshold:                0.8 
 #
