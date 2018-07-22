@@ -155,10 +155,11 @@ private:
     double track_complet[MAX_TRACKS];
     int    track_mcID[MAX_TRACKS];
     int    track_mcPDG[MAX_TRACKS];
-    int    n_cal_points;
-    double track_dQ_dx[10000];
-    double track_dE_dx[10000];
-    double track_range[10000];
+    int    n_cal_points[MAX_TRACKS];
+    double track_dQ_dx[MAX_TRACKS][500];
+    double track_dE_dx[MAX_TRACKS][500];
+    double track_range[MAX_TRACKS][500];
+    double track_pitch[MAX_TRACKS][500];
    
     int     n_recoHits;
     int     hit_channel[MAX_HITS];
@@ -363,10 +364,11 @@ void NDKAna::beginJob(){
   fEventTree->Branch("track_KE", &track_KE,"track_KE[n_reco_tracks][3]/D");
   fEventTree->Branch("track_Prange", &track_Prange,"track_Prange[n_reco_tracks]/D");
   fEventTree->Branch("track_bestplane", &track_bestplane,"track_bestplane[n_reco_tracks]/I");
-  fEventTree->Branch("n_cal_points", &n_cal_points);
-  fEventTree->Branch("track_dQ_dx", &track_dQ_dx,"track_dQ_dx[n_cal_points]/D");
-  fEventTree->Branch("track_dE_dx", &track_dE_dx,"track_dE_dx[n_cal_points]/D");
-  fEventTree->Branch("track_range", &track_range,"track_range[n_cal_points]/D");
+  fEventTree->Branch("n_cal_points", &n_cal_points,"n_cal_points[n_reco_tracks]/I");
+  fEventTree->Branch("track_dQ_dx", &track_dQ_dx,"track_dQ_dx[n_cal_points][500]/D");
+  fEventTree->Branch("track_dE_dx", &track_dE_dx,"track_dE_dx[n_cal_points][500]/D");
+  fEventTree->Branch("track_range", &track_range,"track_range[n_cal_points][500]/D");
+  fEventTree->Branch("track_pitch", &track_pitch,"track_pitch[n_cal_points][500]/D");
   fEventTree->Branch("track_complet", &track_complet,"track_complet[n_reco_tracks]/D");  //track quality variable (completeness) 
   fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");        //track quality variable (purity)
   fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");           //true MC ID for a given track
@@ -614,11 +616,12 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_bestplane[i] = best_plane;
       
        //save dE/dx & dQ/dx
-       n_cal_points = trk_cal[best_plane]->dEdx().size();
-       for( unsigned i =0; i<trk_cal[best_plane]->dEdx().size(); ++i ) {
-          track_dQ_dx[i] = trk_cal[best_plane]->dQdx()[i];
-          track_dE_dx[i] = trk_cal[best_plane]->dEdx()[i];
-          track_range[i] = trk_cal[best_plane]->ResidualRange()[i];
+       n_cal_points[i] = trk_cal[best_plane]->dEdx().size();
+       for( unsigned j =0; j<trk_cal[best_plane]->dEdx().size(); ++j ) {
+          track_dQ_dx[i][j] = trk_cal[best_plane]->dQdx()[j];
+          track_dE_dx[i][j] = trk_cal[best_plane]->dEdx()[j];
+          track_range[i][j] = trk_cal[best_plane]->ResidualRange()[j];
+          track_pitch[i][j] = trk_cal[best_plane]->TrkPitchVec()[j];
        }
        //truth matcher
        double tmpEfrac = 0;
