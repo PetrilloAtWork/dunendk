@@ -365,10 +365,10 @@ void NDKAna::beginJob(){
   fEventTree->Branch("track_Prange", &track_Prange,"track_Prange[n_reco_tracks]/D");
   fEventTree->Branch("track_bestplane", &track_bestplane,"track_bestplane[n_reco_tracks]/I");
   fEventTree->Branch("n_cal_points", &n_cal_points,"n_cal_points[n_reco_tracks]/I");
-  fEventTree->Branch("track_dQ_dx", &track_dQ_dx,"track_dQ_dx[n_cal_points][500]/D");
-  fEventTree->Branch("track_dE_dx", &track_dE_dx,"track_dE_dx[n_cal_points][500]/D");
-  fEventTree->Branch("track_range", &track_range,"track_range[n_cal_points][500]/D");
-  fEventTree->Branch("track_pitch", &track_pitch,"track_pitch[n_cal_points][500]/D");
+  fEventTree->Branch("track_dQ_dx", &track_dQ_dx,"track_dQ_dx[n_reco_tracks][500]/D");
+  fEventTree->Branch("track_dE_dx", &track_dE_dx,"track_dE_dx[n_reco_tracks][500]/D");
+  fEventTree->Branch("track_range", &track_range,"track_range[n_reco_tracks][500]/D");
+  fEventTree->Branch("track_pitch", &track_pitch,"track_pitch[n_reco_tracks][500]/D");
   fEventTree->Branch("track_complet", &track_complet,"track_complet[n_reco_tracks]/D");  //track quality variable (completeness) 
   fEventTree->Branch("track_Efrac", &track_Efrac,"track_Efrac[n_reco_tracks]/D");        //track quality variable (purity)
   fEventTree->Branch("track_mcID", &track_mcID,"track_mcID[n_reco_tracks]/I");           //true MC ID for a given track
