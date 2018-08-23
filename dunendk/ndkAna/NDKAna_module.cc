@@ -137,10 +137,13 @@ private:
 
     int    n_vertices;
     double vertex[MAX_TRACKS][4];
+    int    vtx_ID[MAX_TRACKS];
     int    n_decayVtx;
     double decayVtx[MAX_TRACKS][3];
     int    n_recoTracks;
     int    track_isContained[MAX_TRACKS];
+    int    track_ID[MAX_TRACKS];
+    int    vtxID_trk[MAX_TRACKS][10];
     double track_vtxDir[MAX_TRACKS][3];
     double track_vtx[MAX_TRACKS][4];
     double track_end[MAX_TRACKS][4];
@@ -351,13 +354,16 @@ void NDKAna::beginJob(){
 
   fEventTree->Branch("n_vertices", &n_vertices);
   fEventTree->Branch("vertex", &vertex,"vertex[n_vertices][4]/D");
+  fEventTree->Branch("vtx_ID", &vtx_ID,"vtx_ID[n_vertices]/I");
   fEventTree->Branch("n_reco_tracks", &n_recoTracks);
   fEventTree->Branch("n_decayVtx", &n_decayVtx);
   fEventTree->Branch("decayVtx", &decayVtx,"decayVtx[n_decayVtx][3]/D");  //vertices found using decayID point Alg
+  fEventTree->Branch("vtxID_trk", &vtxID_trk,"vtxID_trk[n_reco_tracks][10]/I"); //track-vertex association 
   fEventTree->Branch("track_vtx", &track_vtx,"track_vtx[n_reco_tracks][4]/D");
   fEventTree->Branch("track_vtxDir", &track_vtxDir,"track_vtxDir[n_reco_tracks][3]/D");
   fEventTree->Branch("track_end", &track_end,"track_end[n_reco_tracks][4]/D");
   fEventTree->Branch("track_isContained", &track_isContained,"track_isContained[n_reco_tracks]/I");
+  fEventTree->Branch("track_ID", &track_ID,"track_ID[n_reco_tracks]/I");
   fEventTree->Branch("track_length", &track_length,"track_length[n_reco_tracks]/D");
   fEventTree->Branch("track_PIDA", &track_PIDA,"track_PIDA[n_reco_tracks][3]/D");
   fEventTree->Branch("track_PID_pdg", &track_PID_pdg,"track_PID_pdg[n_reco_tracks][3]/I");
@@ -534,6 +540,8 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     n_recoTracks = tracklist.size();
     if( n_recoTracks > MAX_TRACKS || n_recoTracks == 0) return;
     
+    art::FindManyP<recob::Vertex> trk_from_vtx(trackListHandle,event,"pmtrack");
+
     art::Handle< std::vector<recob::Vertex> > vtxListHandle;
     std::vector<art::Ptr<recob::Vertex>> vtxlist;
     if(event.getByLabel("pmtrack", vtxListHandle)) 
@@ -543,9 +551,11 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
     if( n_vertices != 0 )
     for( int i =0; i<n_vertices; ++i){
        double tmp_vtx[3] ={-999.0,-999.0,-999.0};
+       vtx_ID[i] = vtxlist[i]->ID(); 
        vtxlist[i]->XYZ(tmp_vtx);
        for( int j=0; j<3; ++j) vertex[i][j]=tmp_vtx[j];
     } 
+  
     art::FindManyP<recob::Hit> track_hits(trackListHandle, event, fTrackModuleLabel);
     std::string calo_ModuleLabel = fTrackModuleLabel;
     calo_ModuleLabel +="calo";
@@ -562,7 +572,14 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
       art::fill_ptr_vector(all_hits, HitHandle); 
     
     for(int i=0; i<n_recoTracks; ++i) {
+
        art::Ptr<recob::Track> track = tracklist[i];
+       //vtx associations 
+       std::vector<art::Ptr<recob::Vertex>> vtxs = trk_from_vtx.at(i);
+       for( size_t j=0; j<vtxs.size(); ++j){
+          art::Ptr<recob::Vertex> vtx = vtxs[j];
+          vtxID_trk[i][j] = vtx->ID();
+       } 
        track_length[i] = track->Length();
        const TVector3 tmp_track_vtx = track->Vertex();
        const TVector3 tmp_track_end = track->End();
@@ -581,6 +598,7 @@ void NDKAna::Process( const art::Event& event, bool &isFiducial){
        track_vtxDir[i][1] = tmp_vtx_dir[1]; 
        track_vtxDir[i][2] = tmp_vtx_dir[2]; 
 
+       track_ID[i] = track->ID();
        track_Prange[i] = trackP.GetTrackMomentum(track_length[i],13); 
        double trk_end[4] ={tmp_track_end[0],tmp_track_end[1],tmp_track_end[2],-999};
        bool track_isInside = insideFV( trk_end );
