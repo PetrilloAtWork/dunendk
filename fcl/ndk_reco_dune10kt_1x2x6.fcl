@@ -7,6 +7,7 @@
 #include "particleid.fcl"
 #include "mctrutht0matching.fcl"
 #include "t0reco.fcl"
+#include "opticaldetectormodules_dune.fcl"
 #include "trackshowerhits.fcl"
 #include "showerfindermodules_dune.fcl"
 #include "emshower3d.fcl"
@@ -52,47 +53,61 @@ physics:
 # actual hit finder
   gaushit:            @local::dunefd_gaushitfinder
   fasthit:            @local::dunefd_fasthitfinder
-#  cchit:              @local::dunefd_clustercrawlerhit
+# disambiguation cheater that removes duplicate hits
+
+# reconstruction using gaushit and disambiguration cheater
 
 # actual disambiguation
   hitfd:             @local::dunefd_hitfinderfd
 # reconstruction using disambiguated hits
-  linecluster:        @local::dune35t_linecluster
-  trajcluster:          @local::dunefdmc_trajcluster
-  calo:               @local::dune35t_calomc
+  linecluster:        @local::standard_linecluster
+  trajcluster:        @local::dunefdmc_trajcluster
+  calo:               @local::standard_calomc
   pandora:            @local::dunefd_pandora
   pandoraTrack:       @local::dune_pandoraTrackCreation
   pandoraShower:      @local::dune_pandoraShowerCreation
   pandoracalo:        @local::dune10kt_calomc
   pandorapid:        @local::standard_chi2pid
-
   pmtrack:             @local::dunefd_pmalgtrackmaker
   pmtrackcalo:         @local::dune10kt_calomc
   pmtrackpid:          @local::standard_chi2pid
-
+  pmtrajfit:          @local::dunefd_pmalgtrajfitter
+  pmtrajfitcalo:      @local::dune10kt_calomc
+  pmtrajfitpid:       @local::standard_chi2pid
 # PMA using trajcluster clusters
   pmtracktc:             @local::dunefd_pmalgtrackmaker
   pmtracktccalo:         @local::dune10kt_calomc
   pmtracktcpid:          @local::standard_chi2pid
-
+# PMA using trajclustter pfparticles
+  pmtrajfittc:             @local::dunefd_pmalgtrajfitter
+  pmtrajfittccalo:         @local::dune10kt_calomc
+  pmtrajfittcpid:          @local::standard_chi2pid
+# photon detector reconstruction
+  ophit:              @local::standard_ophit 
+  opflash:            @local::standard_opflash 
   trkshowersplit:     @local::standard_trackshowerhits
+  trkshowersplitdc:   @local::standard_trackshowerhits
+  blurredclusterdc:      @local::dune10kt_blurredcluster
+  emshowerdc:            @local::dune10kt_emshower
+  emshower3ddc:          @local::dune10kt_emshower3d
+  mergeemshower3ddc:     @local::dune10kt_mergeemshower3d
   blurredcluster:        @local::dune10kt_blurredcluster
   emtrkmichelid:         @local::standard_emtrackmichelid
   emtrkmichelidtc:         @local::standard_emtrackmichelid
   emshower:              @local::dune10kt_emshower
   emshower3d:            @local::dune10kt_emshower3d
   mergeemshower3d:       @local::dune10kt_mergeemshower3d
-
-  #decayid:         @local::standard_particledecayid
  }
 
  #define the producer and filter modules for this path, order matters, 
  #filters reject all following items.  see lines starting physics.producers below
  reco: [ rns, 
          #optical hits and flashes
+         ophit, opflash,
          #TPC wire signals      
          caldata,
          #hit reco 
+         fasthit,
          gaushit, 
          #disambiguation
          hitfd,
@@ -105,9 +120,11 @@ physics:
          pandoracalo, pandorapid,
          #pmatrack
          pmtrack, pmtrackcalo, pmtrackpid,
-         pmtracktc, pmtracktccalo, pmtracktcpid, 
+         pmtrajfit, pmtrajfitcalo, pmtrajfitpid,
+         pmtracktc, pmtracktccalo, pmtracktcpid,
+         pmtrajfittc, pmtrajfittccalo, pmtrajfittcpid,
          #shower reconstruction
-         blurredcluster,  emshower#, emshower3d, mergeemshower3d
+         blurredcluster, emshower#, emshower3d, mergeemshower3d
          ]
 
  #define the output stream, there could be more than one if using filters 
@@ -154,30 +171,52 @@ physics.producers.pmtracktc.PMAlgTracking.MinSeedSize2ndPass:  2
 physics.producers.pmtracktc.PMAlgTracking.FlipToBeam:     false
 physics.producers.pmtracktc.PMAlgTracking.AutoFlip_dQdx:  true
 
+physics.producers.pmtrajfittc.HitModuleLabel:             "trajcluster"
+physics.producers.pmtrajfittc.PfpModuleLabel:             "trajcluster"
+physics.producers.pmtrajfittc.PMAlgFitting.RunVertexing:   true
+
+physics.producers.pmtrajfit.HitModuleLabel:             "linecluster"
+physics.producers.pmtrajfit.PfpModuleLabel:             "pandora"
 
 physics.producers.pmtrackcalo.TrackModuleLabel:         "pmtrack"
 physics.producers.pmtrackcalo.SpacePointModuleLabel:    "pmtrack"
 physics.producers.pmtrackcalo.T0ModuleLabel:            ""
 physics.producers.pmtrackcalo.MakeTree:                 false
 
+physics.producers.pmtrajfitcalo.TrackModuleLabel:         "pmtrajfit"
+physics.producers.pmtrajfitcalo.SpacePointModuleLabel:    "pmtrajfit"
+physics.producers.pmtrajfitcalo.T0ModuleLabel:            ""
+physics.producers.pmtrajfitcalo.MakeTree:                 false
+
 physics.producers.pmtracktccalo.TrackModuleLabel:         "pmtracktc"
 physics.producers.pmtracktccalo.SpacePointModuleLabel:    "pmtracktc"
 physics.producers.pmtracktccalo.T0ModuleLabel:            ""
 physics.producers.pmtracktccalo.MakeTree:                 false
 
+
 physics.producers.pmtrackpid.CalorimetryModuleLabel:  "pmtrackcalo"
 physics.producers.pmtrackpid.TrackModuleLabel:        "pmtrack"
+physics.producers.pmtrajfitpid.CalorimetryModuleLabel:  "pmtrajfitcalo"
+physics.producers.pmtrajfitpid.TrackModuleLabel:        "pmtrajfit"
 physics.producers.pmtracktcpid.CalorimetryModuleLabel:  "pmtracktccalo"
 physics.producers.pmtracktcpid.TrackModuleLabel:        "pmtracktc"
 
+physics.producers.pmtrajfittccalo.TrackModuleLabel:         "pmtrajfittc"
+physics.producers.pmtrajfittccalo.SpacePointModuleLabel:    "pmtrajfittc"
+physics.producers.pmtrajfittccalo.T0ModuleLabel:            ""
+physics.producers.pmtrajfittccalo.MakeTree:                 false
+physics.producers.pmtrajfittcpid.CalorimetryModuleLabel:  "pmtrajfittccalo"
+physics.producers.pmtrajfittcpid.TrackModuleLabel:        "pmtrajfittc"
+
+
 physics.producers.linecluster.HitFinderModuleLabel:     "hitfd"
-physics.producers.trajcluster.TrajClusterAlg.HitFinderModuleLabel:   "hitfd"
 
 physics.producers.calo.TrackModuleLabel:                "costrk"
 physics.producers.calo.SpacePointModuleLabel:           "costrk"
 #physics.producers.kalmanhit.HitModuleLabel:            "hitfd"
 #physics.producers.kalmanhit.ClusterModuleLabel:        "fuzzy"
 
+#Pandora configurations
 physics.producers.pandora.HitFinderModuleLabel:         "linecluster"
 physics.producers.pandoraTrack.PFParticleLabel:         "pandora"
 physics.producers.pandoraShower.PFParticleLabel:        "pandora"
@@ -189,8 +228,10 @@ physics.producers.pandoracalo.MakeTree:                 false
 physics.producers.pandorapid.CalorimetryModuleLabel:    "pandoracalo"
 physics.producers.pandorapid.TrackModuleLabel:          "pandoraTrack"
 
+#Optical detector configuration
+physics.producers.ophit.InputModule:                    "opdigi"
+physics.producers.opflash.InputModule:                  "ophit"
 
-#shower configuration
 physics.producers.blurredcluster.HitsModuleLabel: "linecluster"
 physics.producers.blurredcluster.TrackModuleLabel: "pmtrack"
 physics.producers.blurredcluster.CreateDebugPDF:  false
@@ -221,7 +262,8 @@ physics.producers.emtrkmichelidtc.HitModuleLabel:             "trajcluster"
 physics.producers.emtrkmichelidtc.ClusterModuleLabel:         "trajcluster"
 physics.producers.emtrkmichelidtc.Views:                      []
 
-## this is default reco
+
+#shower configuration
 physics.producers.emshower.ClusterModuleLabel:    "pandora"
 physics.producers.emshower.HitsModuleLabel:       "linecluster"
 physics.producers.emshower.PFParticleModuleLabel: "pandora"
@@ -241,13 +283,3 @@ physics.producers.mergeemshower3d.Trk3DModuleLabel: "emshower3d"
 physics.producers.mergeemshower3d.VtxModuleLabel: "emshower3d"
 physics.producers.mergeemshower3d.WideConeAngle: 20
 
-#physics.producers.decayid.PointIdAlg.NNetModelFile:      "/dune/data/users/higuera/CNN_models/decay_vtxID_gen2.nnet"
-#physics.producers.decayid.PointIdAlg.NNetModelFile:      "./decay_vtxID_gen2.nnet"
-#physics.producers.decayid.PointIdAlg.PatchSizeW:         40     # how many wires in patch
-#physics.producers.decayid.PointIdAlg.PatchSizeD:         44     # how many downsampled ADC entries
-#physics.producers.decayid.PointIdAlg.DriftWindow:        6      # downsampling window in drift ticks
-#physics.producers.decayid.PointIdAlg.DownscaleFn:        "mean" # downsampling function
-#physics.producers.decayid.TrackModuleLabel:              "pmtrack" # tracks to be processed
-#physics.producers.decayid.PointThreshold:                0.998  # threshold on p(decay) used to select decay candidates
-#physics.producers.decayid.RoiThreshold:                0.8 
-#
