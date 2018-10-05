@@ -142,11 +142,11 @@ int TMVA( const char *filename, const char *outfile ){
           double dEdx =signal->track_dE_dx[shortest_trk_idx][k]; 
           int bin_p =h_dEdx_p->GetYaxis()->FindBin(dEdx);
           int bin_k =h_dEdx_k->GetYaxis()->FindBin(dEdx);
-          double tmp_like_p =h_dEdx_p->GetBinContent(k+1,bin_p)/h_dEdx_p->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_p->GetYaxis()->GetNbins()); 
-          double tmp_like_k =h_dEdx_k->GetBinContent(k+1,bin_k)/h_dEdx_k->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_k->GetYaxis()->GetNbins()); 
+          double tmp_like_p =h_dEdx_p->GetBinContent(k+1,bin_p)/h_dEdx_p->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_p->GetYaxis()->GetNbins()+1); 
+          double tmp_like_k =h_dEdx_k->GetBinContent(k+1,bin_k)/h_dEdx_k->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_k->GetYaxis()->GetNbins()+1); 
               
-          if( tmp_like_p == 0 ) tmp_like_p = 1e-3;
-          if( tmp_like_k == 0 ) tmp_like_k = 1e-3;
+          if( tmp_like_p < 1.e-3 ) tmp_like_p = 1e-3;
+          if( tmp_like_k < 1.e-3 ) tmp_like_k = 1e-3;
           like_p *= tmp_like_p;
           like_k *= tmp_like_k;
 
@@ -154,11 +154,11 @@ int TMVA( const char *filename, const char *outfile ){
           int rev_idx = signal->n_cal_points[shortest_trk_idx]-1-k;
           int bin_p_rev =h_dEdx_rev_p->GetYaxis()->FindBin(dEdx);
           int bin_k_rev =h_dEdx_rev_k->GetYaxis()->FindBin(dEdx);
-          double tmp_like_p_rev =h_dEdx_rev_p->GetBinContent(rev_idx+1,bin_p_rev)/h_dEdx_rev_p->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_p->GetYaxis()->GetNbins()); 
-          double tmp_like_k_rev =h_dEdx_rev_k->GetBinContent(rev_idx+1,bin_k_rev)/h_dEdx_rev_k->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_k->GetYaxis()->GetNbins()); 
+          double tmp_like_p_rev =h_dEdx_rev_p->GetBinContent(rev_idx+1,bin_p_rev)/h_dEdx_rev_p->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_p->GetYaxis()->GetNbins()+1); 
+          double tmp_like_k_rev =h_dEdx_rev_k->GetBinContent(rev_idx+1,bin_k_rev)/h_dEdx_rev_k->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_k->GetYaxis()->GetNbins()+1); 
               
-          if( tmp_like_p_rev == 0 ) tmp_like_p_rev = 1e-3;
-          if( tmp_like_k_rev == 0 ) tmp_like_k_rev = 1e-3;
+          if( tmp_like_p_rev < 1.e-3 ) tmp_like_p_rev = 1e-3;
+          if( tmp_like_k_rev < 1.e-3 ) tmp_like_k_rev = 1e-3;
           like_p_rev *= tmp_like_p_rev;
           like_k_rev *= tmp_like_k_rev;
        
@@ -167,8 +167,7 @@ int TMVA( const char *filename, const char *outfile ){
      double like_ratio_rev = like_p_rev/like_k_rev;
      loglike = TMath::Log(like_ratio);
      loglike_rev = TMath::Log(like_ratio_rev);
-     double d_like_ratio = (like_p+like_p_rev)/(like_k+like_k_rev);
-     PID_loglike = TMath::Log(d_like_ratio);
+     PID_loglike = loglike + loglike_rev;
  
      PIDA_longest = signal->track_PIDA[longest_trk_idx][signal->track_bestplane[longest_trk_idx]];
      if( PIDA_longest <0 ) PIDA_longest=signal->track_PIDA[longest_trk_idx][0];
