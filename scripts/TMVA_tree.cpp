@@ -1,23 +1,39 @@
 #include <iostream>
 #include "include/NDKAna.h"
 #include "include/include.h"
+
 using namespace std;
 
-int TMVA( const char *filename, const char *outfile ){
+int TMVA( const char *filename, const char *outfile, bool is_bkgd ){
 
-  TFile *f_temple = new TFile("../PIDA-loglikelihood/bkgd.root");
-  TH2D *h_dEdx_p =  (TH2D*)f_temple->Get("h_dEdx"); 
-  TH2D *h_dEdx_rev_p =  (TH2D*)f_temple->Get("h_dEdx_rev"); 
+  //======= load loglikelihood templates
+  TFile *f_bkgd_template = new TFile("../PIDA-loglikelihood/data/bkgd_template.root","READ");
+  TH2D *h_dEdx_p =  (TH2D*)f_bkgd_template->Get("h_dEdx"); 
+  TH2D *h_dEdx_rev_p =  (TH2D*)f_bkgd_template->Get("h_dEdx_rev"); 
 
-  TFile *f_kaon = new TFile("../PIDA-loglikelihood/signal.root");
-  TH2D *h_dEdx_k =  (TH2D*)f_kaon->Get("h_dEdx"); 
-  TH2D *h_dEdx_rev_k =  (TH2D*)f_kaon->Get("h_dEdx_rev"); 
+  TFile *f_signal_template = new TFile("../PIDA-loglikelihood/data/signal_template.root","READ");
+  TH2D *h_dEdx_k =  (TH2D*)f_signal_template->Get("h_dEdx"); 
+  TH2D *h_dEdx_rev_k =  (TH2D*)f_signal_template->Get("h_dEdx_rev"); 
+ 
+  //======= load cnn score 
+  ifstream f_cnnscore;
+  if( is_bkgd) f_cnnscore.open("../DATA_TDR/bkg_ndk_TDR.txt");
+  else f_cnnscore.open("../DATA_TDR/sig_ndk_TDR.txt");
+ 
+  double tmp_run, tmp_subrun, tmp_event, tmp_score;
+  map<int,double> map_CNNscore;
+  int id_number =0;
+  while(true){
+    f_cnnscore>>tmp_run>>tmp_subrun>>tmp_event>>tmp_score;
+    id_number = 200*(tmp_subrun) + tmp_event;
+    map_CNNscore[id_number]=tmp_score;
+    if( f_cnnscore.eof()) break;
+  }
 
 
   TFile *f_data = new TFile(filename,"READ");
 
   TFile *f = new TFile(outfile,"RECREATE");
-
   cout<<"Lets dance..."<<std::endl;
 
   TTree *tmva_tree = new TTree("TMVA_tree","MVA tree");
@@ -99,6 +115,17 @@ int TMVA( const char *filename, const char *outfile ){
      //======= Reco 
      if( signal->n_reco_tracks < 2 ) continue;
 
+     //======= Add CNN score to TMVA tree 
+     int id_number =  200*(signal->subRunNo) + signal->eventNo; 
+     map<int,double>::iterator it_event;
+     it_event=map_CNNscore.find(id_number);     
+     if( it_event!= map_CNNscore.end() ) 
+       cnn_score = it_event->second; 
+     else{
+       //cout<<"ups did not find image ...ROI fails to find a good APA "<<signal->subRunNo<<" "<<signal->eventNo<<endl;
+       cnn_score =0.0;
+     }
+     //=======  
      run = signal->runNo;
      sub_run = signal->subRunNo;
      ev_n = signal->eventNo;
@@ -142,11 +169,11 @@ int TMVA( const char *filename, const char *outfile ){
           double dEdx =signal->track_dE_dx[shortest_trk_idx][k]; 
           int bin_p =h_dEdx_p->GetYaxis()->FindBin(dEdx);
           int bin_k =h_dEdx_k->GetYaxis()->FindBin(dEdx);
-          double tmp_like_p =h_dEdx_p->GetBinContent(k+1,bin_p)/h_dEdx_p->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_p->GetYaxis()->GetNbins()); 
-          double tmp_like_k =h_dEdx_k->GetBinContent(k+1,bin_k)/h_dEdx_k->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_k->GetYaxis()->GetNbins()); 
+          double tmp_like_p =h_dEdx_p->GetBinContent(k+1,bin_p)/h_dEdx_p->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_p->GetYaxis()->GetNbins()+1); 
+          double tmp_like_k =h_dEdx_k->GetBinContent(k+1,bin_k)/h_dEdx_k->ProjectionY("",k+1,k+1)->Integral(1,h_dEdx_k->GetYaxis()->GetNbins()+1); 
               
-          if( tmp_like_p == 0 ) tmp_like_p = 1e-3;
-          if( tmp_like_k == 0 ) tmp_like_k = 1e-3;
+          if( tmp_like_p < 1.e-3 ) tmp_like_p = 1e-3;
+          if( tmp_like_k < 1.e-3 ) tmp_like_k = 1e-3;
           like_p *= tmp_like_p;
           like_k *= tmp_like_k;
 
@@ -154,11 +181,11 @@ int TMVA( const char *filename, const char *outfile ){
           int rev_idx = signal->n_cal_points[shortest_trk_idx]-1-k;
           int bin_p_rev =h_dEdx_rev_p->GetYaxis()->FindBin(dEdx);
           int bin_k_rev =h_dEdx_rev_k->GetYaxis()->FindBin(dEdx);
-          double tmp_like_p_rev =h_dEdx_rev_p->GetBinContent(rev_idx+1,bin_p_rev)/h_dEdx_rev_p->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_p->GetYaxis()->GetNbins()); 
-          double tmp_like_k_rev =h_dEdx_rev_k->GetBinContent(rev_idx+1,bin_k_rev)/h_dEdx_rev_k->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_k->GetYaxis()->GetNbins()); 
+          double tmp_like_p_rev =h_dEdx_rev_p->GetBinContent(rev_idx+1,bin_p_rev)/h_dEdx_rev_p->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_p->GetYaxis()->GetNbins()+1); 
+          double tmp_like_k_rev =h_dEdx_rev_k->GetBinContent(rev_idx+1,bin_k_rev)/h_dEdx_rev_k->ProjectionY("",rev_idx+1,rev_idx+1)->Integral(1,h_dEdx_rev_k->GetYaxis()->GetNbins()+1); 
               
-          if( tmp_like_p_rev == 0 ) tmp_like_p_rev = 1e-3;
-          if( tmp_like_k_rev == 0 ) tmp_like_k_rev = 1e-3;
+          if( tmp_like_p_rev < 1.e-3 ) tmp_like_p_rev = 1e-3;
+          if( tmp_like_k_rev < 1.e-3 ) tmp_like_k_rev = 1e-3;
           like_p_rev *= tmp_like_p_rev;
           like_k_rev *= tmp_like_k_rev;
        
@@ -167,8 +194,7 @@ int TMVA( const char *filename, const char *outfile ){
      double like_ratio_rev = like_p_rev/like_k_rev;
      loglike = TMath::Log(like_ratio);
      loglike_rev = TMath::Log(like_ratio_rev);
-     double d_like_ratio = (like_p+like_p_rev)/(like_k+like_k_rev);
-     PID_loglike = TMath::Log(d_like_ratio);
+     PID_loglike = loglike + loglike_rev;
  
      PIDA_longest = signal->track_PIDA[longest_trk_idx][signal->track_bestplane[longest_trk_idx]];
      if( PIDA_longest <0 ) PIDA_longest=signal->track_PIDA[longest_trk_idx][0];
@@ -203,6 +229,7 @@ int TMVA( const char *filename, const char *outfile ){
   cout<<"All ine "<<n_ine<<endl;
   f->Write();
   f->Close();
+
   return 0;
 
 }
@@ -217,8 +244,10 @@ int main( int argc, char *argv[] ){
     cout<<"Enter a ROOT file to process..."<<endl;
     return 0;
   }
-  else if( argc == 2) return TMVA(argv[1],"TMVA_tree.root");
-  else if( argc == 3) return TMVA(argv[1],argv[2]);
+  else if( argc == 2) return TMVA(argv[1],"TMVA_tree.root",false);
+  else if( argc == 3) return TMVA(argv[1],argv[2],false);
+  else if( argc == 4) return TMVA(argv[1],argv[2],argv[3]);
+
 
   else return 0;
 }
